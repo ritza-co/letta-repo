@@ -582,6 +582,10 @@ navigation:
         contents:
           - page: Async Multi-Agent
             path: pages/tutorials/multiagent_async.mdx
+      - section: Migrations
+        contents:
+          - page: Migrating from LangChain
+            path: pages/migrations/langchain_chatbot.mdx
 
   - tab: leaderboard
     layout:
