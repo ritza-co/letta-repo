@@ -1,0 +1,1131 @@
+---
+title: Choose Your RAG Database
+subtitle: Integrate ChromaDB, MongoDB Atlas, or Qdrant with Letta Cloud
+slug: cookbooks/choose-your-rag-database
+---
+
+You've built a Retrieval-Augmented Generation (RAG) pipeline with its own vector database, and now you want to connect it to an intelligent agent. This guide shows you how to integrate ChromaDB, MongoDB Atlas Vector Search, or Qdrant with Letta, giving you full control over your data while leveraging Letta's agentic capabilities.
+
+We'll build a research assistant that uses your chosen vector database to answer questions about scientific papers. You'll explore two distinct integration methods:
+
+- **Standard RAG:** Manage retrieval on your client and inject context directly into the agent's prompt
+- **Agentic RAG:** Empower your agent with a custom tool, allowing it to decide when and what to search
+
+Choose the vector database that best fits your needs:
+
+- **ChromaDB Cloud:** Hosted vector database with a simple API and built-in embeddings
+- **MongoDB Atlas Vector Search:** Integrate vector search with your existing MongoDB data
+- **Qdrant:** High-performance vector database with advanced filtering capabilities
+
+## Prerequisites
+
+To follow along, you need free accounts for the following platforms:
+
+- **[Letta](https://www.letta.com):** To access the agent development platform
+- **[Hugging Face](https://huggingface.co/):** For generating embeddings (MongoDB and Qdrant users only)
+- **One of the following vector databases:**
+  - **[ChromaDB Cloud](https://www.trychroma.com/)** for a hosted vector database
+  - **[MongoDB Atlas](https://www.mongodb.com/cloud/atlas/register)** for vector search with MongoDB
+  - **[Qdrant Cloud](https://cloud.qdrant.io/)** for a high-performance vector database
+
+You will also need Python 3.8+ and a code editor.
+
+<Note>
+**MongoDB and Qdrant users:** This guide uses Hugging Face's Inference API for generating embeddings. This approach keeps the tool code lightweight enough to run in Letta's sandbox environment.
+</Note>
+
+### Getting Your API Keys
+
+We'll need API keys for Letta and your chosen vector database.
+
+<AccordionGroup>
+<Accordion title="Get your Letta API Key">
+<Steps>
+  <Step title="Create a Letta Account">
+    If you don't have one, sign up for a free account at [letta.com](https://www.letta.com).
+  </Step>
+  <Step title="Navigate to API Keys">
+    Once logged in, click on **API keys** in the sidebar.
+    ![Letta API Key Navigation](/images/letta-api-key-nav.png)
+  </Step>
+  <Step title="Create and Copy Your Key">
+    Click **+ Create API key**, give it a descriptive name, and click **Confirm**. Copy the key and save it somewhere safe.
+  </Step>
+</Steps>
+</Accordion>
+
+<Accordion title="Get your ChromaDB Cloud credentials">
+<Steps>
+  <Step title="Create a ChromaDB Cloud Account">
+    Sign up for a free account on the [ChromaDB Cloud website](https://www.trychroma.com/).
+  </Step>
+  <Step title="Create a New Database">
+    From your dashboard, create a new database.
+    ![ChromaDB New Project](/images/chroma-new-project.png)
+  </Step>
+  <Step title="Get Your API Key and Host">
+    In your project settings, you'll find your **API Key**, **Tenant**, **Database**, and **Host URL**. We'll need all of these for our scripts.
+    ![ChromaDB Keys](/images/chroma-keys.png)
+  </Step>
+</Steps>
+</Accordion>
+
+<Accordion title="Get your MongoDB Atlas credentials">
+<Steps>
+  <Step title="Create a MongoDB Atlas Account">
+    Sign up for a free account at [mongodb.com/cloud/atlas/register](https://www.mongodb.com/cloud/atlas/register).
+  </Step>
+  <Step title="Create a Free Cluster">
+    Click **Build a Cluster** and select the free tier (M0). Choose your preferred cloud provider and region and click **Create deployement**.
+    ![Create MongoDB Cluster](/images/create-cluster-mongodb.png)
+  </Step>
+  <Step title="Set Up Database Access">
+    Next set up connection security.
+    1. Create a database user, then click **Choose a connection method**
+    2. Choose **Drivers** to connect to your application, choose python as the driver.
+    3. Copy the **entire** connection string, including the query parameters at the end. It will look like this:
+
+    ```
+    mongodb+srv://<username>:<password>@cluster0.xxxxx.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0
+    ```
+
+    <Note>
+    Make sure to replace `<password>` with your actual database user password. Keep all the query parameters (`?retryWrites=true&w=majority&appName=Cluster0`) - they are required for proper connection configuration.
+    </Note>
+
+    ![MongoDB Connection String](/images/connection-string-mongodb.png)
+  </Step>
+  <Step title="Configure Network Access (IP Whitelist)">
+    By default, MongoDB Atlas blocks all outside connections. You must grant access to the services that need to connect.
+
+    1. Navigate to **Database and Network Access** in the left sidebar.
+    2. Click **Add IP Address**.
+    3. For local development and testing, select **Allow Access From Anywhere**. This will add the IP address `0.0.0.0/0`.
+    4. Click **Confirm**.
+
+    ![MongoDB IP Configuration](/images/ip-config-mongodb.png)
+
+    <Note>
+    For a production environment, you would replace `0.0.0.0/0` with a secure list of static IP addresses provided by your hosting service (e.g., Letta).
+    </Note>
+  </Step>
+</Steps>
+</Accordion>
+
+<Accordion title="Get your Qdrant Cloud credentials">
+<Steps>
+  <Step title="Create a Qdrant Cloud Account">
+    Sign up for a free account at [cloud.qdrant.io](https://cloud.qdrant.io/).
+  </Step>
+  <Step title="Create a New Cluster">
+    From your dashboard, click **Clusters** and then **+ Create**. Select the free tier and choose your preferred region.
+    ![Create Qdrant Cluster](/images/qdrant-create-cluster.png)
+  </Step>
+  <Step title="Get Your API Key and URL">
+    Once your cluster is created, click on it to view details. 
+    
+    Copy the following:
+
+    1. **API Key**
+    2. **Cluster URL**
+
+    ![Qdrant Connection Details](/images/qdrant-connection-details.png)
+    
+  </Step>
+</Steps>
+</Accordion>
+
+<Accordion title="Get your Hugging Face API Token (MongoDB & Qdrant users)">
+<Steps>
+  <Step title="Create a Hugging Face Account">
+    Sign up for a free account at [huggingface.co](https://huggingface.co/join).
+  </Step>
+  <Step title="Create Access Token">
+    Click the profile icon in the top right. Navigate to **Settings** > **Access Tokens** (or go directly to [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens)).
+  </Step>
+  <Step title="Generate New Token">
+    Click **New token**, give it a name (e.g., "Letta RAG Demo"), select **Read** role, and click **Create token**. Copy the token and save it securely.
+    ![Hugging Face Token](/images/hf-token.png)
+  </Step>
+</Steps>
+
+<Note>
+The free tier includes 30,000 API requests per month, which is more than enough for development and testing.
+</Note>
+</Accordion>
+</AccordionGroup>
+
+Once you have these credentials, create a `.env` file in your project directory. Add the credentials for your chosen database:
+
+<CodeBlocks>
+```bash title="ChromaDB"
+LETTA_API_KEY="..."
+CHROMA_API_KEY="..."
+CHROMA_TENANT="..."
+CHROMA_DATABASE="..."
+```
+
+```bash title="MongoDB Atlas"
+LETTA_API_KEY="..."
+MONGODB_URI="mongodb+srv://username:password@cluster0.xxxxx.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+MONGODB_DB_NAME="rag_demo"
+HF_API_KEY="..."
+```
+
+```bash title="Qdrant"
+LETTA_API_KEY="..."
+QDRANT_URL="https://xxxxx.cloud.qdrant.io"
+QDRANT_API_KEY="..."
+HF_API_KEY="..."
+```
+</CodeBlocks>
+
+## Part 1: Standard RAG — Full Control on the Client-Side
+
+In the standard RAG approach, your application takes the lead. It fetches relevant information from your vector database and passes this context, along with your query, to a Letta agent. This method gives you complete control over the retrieval logic.
+
+### Step 1: Set Up the Vector Database
+
+First, we need to populate your chosen vector database with research paper content. We'll use two papers for this demo: ["Attention Is All You Need"](https://arxiv.org/abs/1706.03762) and ["BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding"](https://arxiv.org/abs/1810.04805).
+
+Create a Python virtual environment to keep dependencies isolated:
+
+```shell
+python -m venv venv
+source venv/bin/activate  # On Windows, use: venv\Scripts\activate
+```
+
+Download the research papers using curl with the `-L` flag to follow redirects:
+
+```shell
+curl -L -o 1706.03762.pdf https://arxiv.org/pdf/1706.03762.pdf
+curl -L -o 1810.04805.pdf https://arxiv.org/pdf/1810.04805.pdf
+```
+
+Verify the PDFs downloaded correctly:
+
+```shell
+file 1706.03762.pdf 1810.04805.pdf
+```
+
+You should see output indicating these are PDF documents, not HTML files.
+
+Now create a `requirements.txt` file with the necessary Python libraries for your chosen database:
+
+<CodeBlocks>
+```txt title="ChromaDB"
+letta-client
+chromadb
+pypdf
+python-dotenv
+```
+
+```txt title="MongoDB Atlas"
+letta-client
+pymongo
+pypdf
+python-dotenv
+requests
+certifi
+dnspython
+```
+
+```txt title="Qdrant"
+letta-client
+qdrant-client
+pypdf
+python-dotenv
+requests
+```
+</CodeBlocks>
+
+Install them:
+
+```shell
+pip install -r requirements.txt
+```
+
+Now create a `setup.py` file to load the PDFs, split them into chunks, and ingest them into your database:
+
+<CodeBlocks>
+```python title="ChromaDB"
+import os
+import chromadb
+import pypdf
+from dotenv import load_dotenv
+
+load_dotenv()
+
+def main():
+    # Connect to ChromaDB Cloud
+    client = chromadb.CloudClient(
+        tenant=os.getenv("CHROMA_TENANT"),
+        database=os.getenv("CHROMA_DATABASE"),
+        api_key=os.getenv("CHROMA_API_KEY")
+    )
+
+    # Create or get the collection
+    collection = client.get_or_create_collection("rag_collection")
+
+    # Ingest PDFs
+    pdf_files = ["1706.03762.pdf", "1810.04805.pdf"]
+    for pdf_file in pdf_files:
+        print(f"Ingesting {pdf_file}...")
+        reader = pypdf.PdfReader(pdf_file)
+        for i, page in enumerate(reader.pages):
+            collection.add(
+                ids=[f"{pdf_file}-{i}"],
+                documents=[page.extract_text()]
+            )
+
+    print("\nIngestion complete!")
+    print(f"Total documents in collection: {collection.count()}")
+
+if __name__ == "__main__":
+    main()
+```
+
+```python title="MongoDB Atlas"
+import os
+import pymongo
+import pypdf
+import requests
+import certifi
+from dotenv import load_dotenv
+
+load_dotenv()
+
+def get_embedding(text, api_key):
+    """Get embedding from Hugging Face Inference API"""
+    API_URL = "https://api-inference.huggingface.co/models/BAAI/bge-small-en-v1.5"
+    headers = {"Authorization": f"Bearer {api_key}"}
+
+    response = requests.post(API_URL, headers=headers, json={"inputs": [text], "options": {"wait_for_model": True}})
+
+    if response.status_code == 200:
+        return response.json()[0]  # Extract the inner list
+    else:
+        raise Exception(f"HF API error: {response.status_code} - {response.text}")
+
+def main():
+    hf_api_key = os.getenv("HF_API_KEY")
+    mongodb_uri = os.getenv("MONGODB_URI")
+    db_name = os.getenv("MONGODB_DB_NAME")
+
+    if not all([hf_api_key, mongodb_uri, db_name]):
+        print("Error: Ensure HF_API_KEY, MONGODB_URI, and MONGODB_DB_NAME are in .env file")
+        return
+
+    # Connect to MongoDB Atlas using certifi
+    client = pymongo.MongoClient(mongodb_uri, tlsCAFile=certifi.where())
+    db = client[db_name]
+    collection = db["rag_collection"]
+
+    # Ingest PDFs
+    pdf_files = ["1706.03762.pdf", "1810.04805.pdf"]
+    for pdf_file in pdf_files:
+        print(f"Ingesting {pdf_file}...")
+        reader = pypdf.PdfReader(pdf_file)
+        for i, page in enumerate(reader.pages):
+            text = page.extract_text()
+            if not text: # Skip empty pages
+                continue
+
+            # Generate embedding using Hugging Face
+            print(f"  Processing page {i+1}...")
+            try:
+                embedding = get_embedding(text, hf_api_key)
+                collection.insert_one({
+                    "_id": f"{pdf_file}-{i}",
+                    "text": text,
+                    "embedding": embedding,
+                    "source": pdf_file,
+                    "page": i
+                })
+            except Exception as e:
+                print(f"    Could not process page {i+1}: {e}")
+
+
+    print("\nIngestion complete!")
+    print(f"Total documents in collection: {collection.count_documents({})}")
+
+    # Create vector search index
+    print("\nNext: Go to your MongoDB Atlas dashboard and create a search index named 'vector_index'")
+    print("Use the following JSON definition:")
+    print('''{
+  "fields": [
+    {
+      "type": "vector",
+      "path": "embedding",
+      "numDimensions": 384,
+      "similarity": "cosine"
+    }
+  ]
+}''')
+
+if __name__ == "__main__":
+    main()
+```
+
+```python title="Qdrant"
+import os
+import pypdf
+import requests
+from dotenv import load_dotenv
+from qdrant_client import QdrantClient
+from qdrant_client.models import Distance, VectorParams, PointStruct
+
+load_dotenv()
+
+def get_embedding(text, api_key):
+    """Get embedding from Hugging Face Inference API"""
+    API_URL = "https://api-inference.huggingface.co/models/BAAI/bge-small-en-v1.5"
+    headers = {"Authorization": f"Bearer {api_key}"}
+
+    response = requests.post(API_URL, headers=headers, json={"inputs": text, "options": {"wait_for_model": True}})
+
+    if response.status_code == 200:
+        return response.json()
+    else:
+        raise Exception(f"HF API error: {response.status_code} - {response.text}")
+
+def main():
+    hf_api_key = os.getenv("HF_API_KEY")
+
+    if not hf_api_key:
+        print("Error: HF_API_KEY not found in .env file")
+        return
+
+    # Connect to Qdrant Cloud
+    client = QdrantClient(
+        url=os.getenv("QDRANT_URL"),
+        api_key=os.getenv("QDRANT_API_KEY")
+    )
+
+    # Create collection
+    collection_name = "rag_collection"
+
+    # Check if collection exists, if not create it
+    collections = client.get_collections().collections
+    if collection_name not in [c.name for c in collections]:
+        client.create_collection(
+            collection_name=collection_name,
+            vectors_config=VectorParams(size=384, distance=Distance.COSINE)
+        )
+
+    # Ingest PDFs
+    pdf_files = ["1706.03762.pdf", "1810.04805.pdf"]
+    point_id = 0
+
+    for pdf_file in pdf_files:
+        print(f"Ingesting {pdf_file}...")
+        reader = pypdf.PdfReader(pdf_file)
+        for i, page in enumerate(reader.pages):
+            text = page.extract_text()
+
+            # Generate embedding using Hugging Face
+            print(f"  Processing page {i+1}...")
+            embedding = get_embedding(text, hf_api_key)
+
+            client.upsert(
+                collection_name=collection_name,
+                points=[
+                    PointStruct(
+                        id=point_id,
+                        vector=embedding,
+                        payload={"text": text, "source": pdf_file, "page": i}
+                    )
+                ]
+            )
+            point_id += 1
+
+    print("\nIngestion complete!")
+    collection_info = client.get_collection(collection_name)
+    print(f"Total documents in collection: {collection_info.points_count}")
+
+if __name__ == "__main__":
+    main()
+```
+</CodeBlocks>
+
+Run the script from your terminal:
+
+```shell
+python setup.py
+```
+
+#### Create the Vector Search Index (MongoDB Atlas Only)
+
+<Note>
+**MongoDB Atlas users:** The setup script ingests your data, but MongoDB Atlas requires you to manually create a vector search index before queries will work. Follow these steps carefully.
+</Note>
+
+<Steps>
+  <Step title="Navigate to Atlas Search">
+    Log in to your [MongoDB Atlas dashboard](https://cloud.mongodb.com/), navigate to your cluster, and click on the **"Atlas Search"** tab.
+  </Step>
+  <Step title="Create Search Index">
+    Click **"Create Search Index"**, then choose **"JSON Editor"** (not "Visual Editor").
+  </Step>
+  <Step title="Select Database and Collection">
+    - Database: Select **`rag_demo`** (or whatever you set as `MONGODB_DB_NAME`)
+    - Collection: Select **`rag_collection`**
+  </Step>
+  <Step title="Name and Configure Index">
+    - Index Name: Enter **`vector_index`** (this exact name is required by the code)
+    - Paste this JSON definition:
+    ```json
+    {
+      "fields": [
+        {
+          "type": "vector",
+          "path": "embedding",
+          "numDimensions": 384,
+          "similarity": "cosine"
+        }
+      ]
+    }
+    ```
+    **Note:** 384 dimensions is for Hugging Face's `all-MiniLM-L6-v2` model.
+  </Step>
+  <Step title="Create and Wait">
+    Click **"Create Search Index"**. The index will take a few minutes to build. Wait until the status shows as **"Active"** before proceeding.
+  </Step>
+</Steps>
+
+Your vector database is now populated with research paper content and ready to query.
+
+### Step 2: Create a "Stateless" Letta Agent
+
+For the standard RAG approach, the Letta agent doesn't need any special tools or complex instructions. Its only job is to answer a question based on the context we provide. We can create this agent programmatically using the Letta SDK.
+
+Create a file named `create_agent.py`:
+
+```python
+import os
+from letta_client import Letta
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# Initialize the Letta client
+client = Letta(token=os.getenv("LETTA_API_KEY"))
+
+# Create the agent
+agent = client.agents.create(
+    name="Stateless RAG Agent",
+    description="This agent answers questions based on provided context. It has no tools or special memory.",
+    memory_blocks=[
+        {
+            "label": "persona",
+            "value": "You are a helpful research assistant. Answer the user's question based *only* on the context provided."
+        }
+    ]
+)
+
+print(f"Agent '{agent.name}' created with ID: {agent.id}")
+```
+
+Run this script once to create the agent in your Letta project:
+
+```shell
+python create_agent.py
+```
+
+![Stateless Agent in Letta UI](/images/stateless-agent-ui.png)
+
+### Step 3: Query, Format, and Ask
+
+Now we'll write the main script, `standard_rag.py`, that ties everything together. This script will:
+
+1. Take a user's question
+2. Query your vector database to find the most relevant document chunks
+3. Construct a detailed prompt that includes both the user's question and the retrieved context
+4. Send this combined prompt to our stateless Letta agent and print the response
+
+<CodeBlocks>
+```python title="ChromaDB"
+import os
+import chromadb
+from letta_client import Letta
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# Initialize clients
+letta_client = Letta(token=os.getenv("LETTA_API_KEY"))
+chroma_client = chromadb.CloudClient(
+    tenant=os.getenv("CHROMA_TENANT"),
+    database=os.getenv("CHROMA_DATABASE"),
+    api_key=os.getenv("CHROMA_API_KEY")
+)
+
+AGENT_ID = "your-stateless-agent-id"  # Replace with your agent ID
+
+def main():
+    while True:
+        question = input("\nAsk a question about the research papers: ")
+        if question.lower() in ['exit', 'quit']:
+            break
+
+        # 1. Query ChromaDB
+        collection = chroma_client.get_collection("rag_collection")
+        results = collection.query(query_texts=[question], n_results=3)
+        context = "\n".join(results["documents"][0])
+
+        # 2. Construct the prompt
+        prompt = f'''Context from research paper:
+{context}
+
+Question: {question}
+
+Answer:'''
+
+        # 3. Send to Letta Agent
+        response = letta_client.agents.messages.create(
+            agent_id=AGENT_ID,
+            messages=[{"role": "user", "content": prompt}]
+        )
+
+        for message in response.messages:
+            if message.message_type == 'assistant_message':
+                print(f"\nAgent: {message.content}")
+
+if __name__ == "__main__":
+    main()
+```
+
+```python title="MongoDB Atlas"
+import os
+import pymongo
+import requests
+import certifi
+from letta_client import Letta
+from dotenv import load_dotenv
+
+load_dotenv()
+
+def get_embedding(text, api_key):
+    """Get embedding from Hugging Face Inference API"""
+    API_URL = "https://api-inference.huggingface.co/models/BAAI/bge-small-en-v1.5"
+    headers = {"Authorization": f"Bearer {api_key}"}
+    response = requests.post(API_URL, headers=headers, json={"inputs": [text], "options": {"wait_for_model": True}})
+
+    if response.status_code == 200:
+        return response.json()[0]
+    else:
+        raise Exception(f"HuggingFace API error: {response.status_code} - {response.text}")
+
+# Initialize clients
+letta_client = Letta(token=os.getenv("LETTA_API_KEY"))
+mongo_client = pymongo.MongoClient(os.getenv("MONGODB_URI"), tlsCAFile=certifi.where())
+db = mongo_client[os.getenv("MONGODB_DB_NAME")]
+collection = db["rag_collection"]
+hf_api_key = os.getenv("HF_API_KEY")
+
+AGENT_ID = "your-stateless-agent-id"  # Replace with your agent ID
+
+def main():
+    while True:
+        question = input("\nAsk a question about the research papers: ")
+        if question.lower() in ['exit', 'quit']:
+            break
+
+        # 1. Query MongoDB Atlas Vector Search
+        query_embedding = get_embedding(question, hf_api_key)
+
+        results = collection.aggregate([
+            {
+                "$vectorSearch": {
+                    "index": "vector_index",
+                    "path": "embedding",
+                    "queryVector": query_embedding,
+                    "numCandidates": 100,
+                    "limit": 3
+                }
+            },
+            {
+                "$project": {
+                    "text": 1,
+                    "source": 1,
+                    "page": 1,
+                    "score": {"$meta": "vectorSearchScore"}
+                }
+            }
+        ])
+
+        contexts = [doc.get("text", "") for doc in results]
+        context = "\n\n".join(contexts)
+
+        # 2. Construct the prompt
+        prompt = f'''Context from research paper:
+{context}
+
+Question: {question}
+
+Answer:'''
+
+        # 3. Send to Letta Agent
+        response = letta_client.agents.messages.create(
+            agent_id=AGENT_ID,
+            messages=[{"role": "user", "content": prompt}]
+        )
+
+        for message in response.messages:
+            if message.message_type == 'assistant_message':
+                print(f"\nAgent: {message.content}")
+
+if __name__ == "__main__":
+    main()
+```
+
+```python title="Qdrant"
+import os
+import requests
+from letta_client import Letta
+from dotenv import load_dotenv
+from qdrant_client import QdrantClient
+
+load_dotenv()
+
+def get_embedding(text, api_key):
+    """Get embedding from Hugging Face Inference API"""
+    API_URL = "https://api-inference.huggingface.co/models/BAAI/bge-small-en-v1.5"
+    headers = {"Authorization": f"Bearer {api_key}"}
+    response = requests.post(API_URL, headers=headers, json={"inputs": text, "options": {"wait_for_model": True}})
+
+    if response.status_code == 200:
+        return response.json()
+    else:
+        raise Exception(f"HuggingFace API error: {response.status_code} - {response.text}")
+
+# Initialize clients
+letta_client = Letta(token=os.getenv("LETTA_API_KEY"))
+qdrant_client = QdrantClient(
+    url=os.getenv("QDRANT_URL"),
+    api_key=os.getenv("QDRANT_API_KEY")
+)
+hf_api_key = os.getenv("HF_API_KEY")
+
+AGENT_ID = "your-stateless-agent-id"  # Replace with your agent ID
+
+def main():
+    while True:
+        question = input("\nAsk a question about the research papers: ")
+        if question.lower() in ['exit', 'quit']:
+            break
+
+        # 1. Query Qdrant
+        query_embedding = get_embedding(question, hf_api_key)
+
+        results = qdrant_client.query_points(
+            collection_name="rag_collection",
+            query=query_embedding,
+            limit=3
+        )
+
+        contexts = [hit.payload["text"] for hit in results.points]
+        context = "\n".join(contexts)
+
+        # 2. Construct the prompt
+        prompt = f'''Context from research paper:
+{context}
+
+Question: {question}
+
+Answer:'''
+
+        # 3. Send to Letta Agent
+        response = letta_client.agents.messages.create(
+            agent_id=AGENT_ID,
+            messages=[{"role": "user", "content": prompt}]
+        )
+
+        for message in response.messages:
+            if message.message_type == 'assistant_message':
+                print(f"\nAgent: {message.content}")
+
+if __name__ == "__main__":
+    main()
+```
+</CodeBlocks>
+
+<Note>
+Replace `your-stateless-agent-id` with the actual ID of the agent you created in the previous step.
+</Note>
+
+When you run this script, your application performs the retrieval, and the Letta agent provides the answer based on the context it receives. This gives you full control over the data pipeline.
+
+## Part 2: Agentic RAG — Empowering Your Agent with Tools
+
+In the agentic RAG approach, we delegate the retrieval process to the agent itself. Instead of your application deciding what to search for, we provide the agent with a custom tool that allows it to query your vector database directly. This makes the agent more autonomous and your client-side code much simpler.
+
+### Step 4: Create a Custom Search Tool
+
+A Letta tool is a Python function that your agent can call. We'll create a function that searches your vector database and returns the results. Letta handles the complexities of exposing this function to the agent securely.
+
+Create a new file named `tools.py` with the appropriate implementation for your database:
+
+<CodeBlocks>
+```python title="ChromaDB"
+def search_research_papers(query_text: str, n_results: int = 1) -> str:
+    """
+    Searches the research paper collection for a given query.
+
+    Args:
+        query_text (str): The text to search for.
+        n_results (int): The number of results to return.
+
+    Returns:
+        str: The most relevant document found.
+    """
+    import chromadb
+    import os
+
+    # ChromaDB Cloud Client
+    api_key = os.getenv("CHROMA_API_KEY")
+    tenant = os.getenv("CHROMA_TENANT")
+    database = os.getenv("CHROMA_DATABASE")
+
+    if not all([api_key, tenant, database]):
+        raise ValueError("CHROMA_API_KEY, CHROMA_TENANT, and CHROMA_DATABASE must be set as environment variables.")
+
+    client = chromadb.CloudClient(
+        tenant=tenant,
+        database=database,
+        api_key=api_key
+    )
+
+    collection = client.get_or_create_collection("rag_collection")
+
+    try:
+        results = collection.query(
+            query_texts=[query_text],
+            n_results=n_results
+        )
+
+        document = results['documents'][0][0]
+        return document
+    except Exception as e:
+        return f"Tool failed with error: {e}"
+```
+
+```python title="MongoDB Atlas"
+import os
+
+def search_research_papers(query_text: str, n_results: int = 1) -> str:
+    """
+    Searches the research paper collection for a given query using Hugging Face embeddings.
+
+    Args:
+        query_text (str): The text to search for.
+        n_results (int): The number of results to return.
+
+    Returns:
+        str: The most relevant documents found.
+    """
+    import requests
+    import pymongo
+    import certifi
+
+    try:
+        n_results = int(n_results)
+    except (ValueError, TypeError):
+        n_results = 1
+
+    mongodb_uri = os.getenv("MONGODB_URI")
+    db_name = os.getenv("MONGODB_DB_NAME")
+    hf_api_key = os.getenv("HF_API_KEY")
+
+    if not all([mongodb_uri, db_name, hf_api_key]):
+        raise ValueError("MONGODB_URI, MONGODB_DB_NAME, and HF_API_KEY must be set as environment variables.")
+
+    # --- Hugging Face API Call ---
+    try:
+        response = requests.post(
+            "https://api-inference.huggingface.co/models/BAAI/bge-small-en-v1.5",
+            headers={"Authorization": f"Bearer {hf_api_key}"},
+            json={"inputs": [query_text], "options": {"wait_for_model": True}},
+            timeout=30
+        )
+        response.raise_for_status()  # Will raise an HTTPError for bad responses (4xx or 5xx)
+        query_embedding = response.json()[0]
+    except requests.exceptions.RequestException as e:
+        return f"Hugging Face API request failed: {e}"
+
+    # --- MongoDB Atlas Connection & Search ---
+    try:
+        client = pymongo.MongoClient(mongodb_uri, tlsCAFile=certifi.where(), serverSelectionTimeoutMS=30000)
+        collection = client[db_name]["rag_collection"]
+        pipeline = [
+            {
+                "$vectorSearch": {
+                    "index": "vector_index",
+                    "path": "embedding",
+                    "queryVector": query_embedding,
+                    "numCandidates": 100,
+                    "limit": n_results
+                }
+            },
+            {
+                "$project": {
+                    "text": 1,
+                    "source": 1,
+                    "page": 1,
+                    "score": {"$meta": "vectorSearchScore"}
+                }
+            }
+        ]
+        results = list(collection.aggregate(pipeline))
+    except pymongo.errors.PyMongoError as e:
+        return f"MongoDB operation failed: {e}"
+
+    # --- Final Processing ---
+    documents = [doc.get("text", "") for doc in results]
+    return "\n\n".join(documents) if documents else "No results found."
+```
+
+```python title="Qdrant"
+def search_research_papers(query_text: str, n_results: int = 1) -> str:
+    """
+    Searches the research paper collection for a given query using Hugging Face embeddings.
+
+    Args:
+        query_text (str): The text to search for.
+        n_results (int): The number of results to return.
+
+    Returns:
+        str: The most relevant documents found.
+    """
+    import os
+    import requests
+    from qdrant_client import QdrantClient
+
+    # Qdrant Cloud Client
+    url = os.getenv("QDRANT_URL")
+    api_key = os.getenv("QDRANT_API_KEY")
+    hf_api_key = os.getenv("HF_API_KEY")
+
+    if not all([url, api_key, hf_api_key]):
+        raise ValueError("QDRANT_URL, QDRANT_API_KEY, and HF_API_KEY must be set as environment variables.")
+
+    # Connect to Qdrant
+    client = QdrantClient(url=url, api_key=api_key)
+
+    try:
+        # Generate embedding using Hugging Face
+        API_URL = "https://api-inference.huggingface.co/models/BAAI/bge-small-en-v1.5"
+        headers = {"Authorization": f"Bearer {hf_api_key}"}
+        response = requests.post(API_URL, headers=headers, json={"inputs": query_text, "options": {"wait_for_model": True}})
+
+        if response.status_code != 200:
+            return f"HF API error: {response.status_code}"
+
+        query_embedding = response.json()
+
+        # Search Qdrant
+        results = client.query_points(
+            collection_name="rag_collection",
+            query=query_embedding,
+            limit=n_results
+        )
+
+        documents = [hit.payload["text"] for hit in results.points]
+        return "\n\n".join(documents) if documents else "No results found."
+    except Exception as e:
+        return f"Tool failed with error: {e}"
+```
+</CodeBlocks>
+
+This function takes a query, connects to your database, retrieves the most relevant documents, and returns them as a single string.
+
+### Step 5: Configure a "Smart" Research Agent
+
+Next, we'll create a new, more advanced agent. This agent will have a specific persona that instructs it on how to behave and, most importantly, it will be equipped with our new search tool.
+
+Create a file named `create_agentic_agent.py`:
+
+```python
+import os
+from letta_client import Letta
+from dotenv import load_dotenv
+from tools import search_research_papers
+
+load_dotenv()
+
+# Initialize the Letta client
+client = Letta(token=os.getenv("LETTA_API_KEY"))
+
+# Create a tool from our Python function
+search_tool = client.tools.create_from_function(func=search_research_papers)
+
+# Define the agent's persona
+persona = """You are a world-class research assistant. Your goal is to answer questions accurately by searching through a database of research papers. When a user asks a question, first use the `search_research_papers` tool to find relevant information. Then, answer the user's question based on the information returned by the tool."""
+
+# Create the agent with the tool attached
+agent = client.agents.create(
+    name="Agentic RAG Assistant",
+    description="A smart agent that can search a vector database to answer questions.",
+    memory_blocks=[
+        {
+            "label": "persona",
+            "value": persona
+        }
+    ],
+    tools=[search_tool.name]
+)
+
+print(f"Agent '{agent.name}' created with ID: {agent.id}")
+```
+
+Run this script to create the agent:
+
+```shell
+python create_agentic_agent.py
+```
+
+#### Configure Tool Dependencies and Environment Variables
+
+For the tool to work within Letta's environment, we need to configure its dependencies and environment variables through the Letta dashboard.
+
+<Steps>
+  <Step title="Find your agent">
+    Navigate to your Letta dashboard and find the "Agentic RAG Assistant" agent you just created.
+  </Step>
+  <Step title="Access the ADE">
+    Click on your agent to open the Agent Development Environment (ADE).
+  </Step>
+  <Step title="Configure Dependencies">
+    In the ADE, select **Tools** from the sidebar, find and click on the `search_research_papers` tool, then click on the **Dependencies** tab.
+
+    Add the following dependencies based on your database:
+
+    <CodeBlocks>
+    ```txt title="ChromaDB"
+    chromadb
+    ```
+
+    ```txt title="MongoDB Atlas"
+    pymongo
+    requests
+    certifi
+    dnspython
+    ```
+
+    ```txt title="Qdrant"
+    qdrant-client
+    requests
+    ```
+    </CodeBlocks>
+
+    ![Letta Dependencies Configuration](/images/letta-dep-config.png)
+  </Step>
+  <Step title="Configure Environment Variables">
+    In the same tool configuration, navigate to **Simulator** > **Environment**.
+
+    Add the following environment variables with their corresponding values from your `.env` file:
+
+    <CodeBlocks>
+    ```txt title="ChromaDB"
+    CHROMA_API_KEY
+    CHROMA_TENANT
+    CHROMA_DATABASE
+    ```
+
+    ```txt title="MongoDB Atlas"
+    MONGODB_URI
+    MONGODB_DB_NAME
+    HF_API_KEY
+    ```
+
+    ```txt title="Qdrant"
+    QDRANT_URL
+    QDRANT_API_KEY
+    HF_API_KEY
+    ```
+    </CodeBlocks>
+
+    ![Letta Tool Configuration](/images/letta-tool-config.png)
+  </Step>
+</Steps>
+
+Now, when the agent calls this tool, Letta's execution environment will know to install the necessary dependencies and will have access to the necessary credentials to connect to your database.
+
+### Step 6: Let the Agent Lead the Conversation
+
+With the agentic setup, our client-side code becomes incredibly simple. We no longer need to worry about retrieving context; we send the user's raw question to the agent and let it handle the rest.
+
+Create the `agentic_rag.py` script:
+
+```python
+import os
+from letta_client import Letta
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# Initialize client
+letta_client = Letta(token=os.getenv("LETTA_API_KEY"))
+
+AGENT_ID = "your-agentic-agent-id"  # Replace with your new agent ID
+
+def main():
+    while True:
+        user_query = input("\nAsk a question about the research papers: ")
+        if user_query.lower() in ['exit', 'quit']:
+            break
+
+        response = letta_client.agents.messages.create(
+            agent_id=AGENT_ID,
+            messages=[{"role": "user", "content": user_query}]
+        )
+
+        for message in response.messages:
+            if message.message_type == 'assistant_message':
+                print(f"\nAgent: {message.content}")
+
+if __name__ == "__main__":
+    main()
+```
+
+<Note>
+Replace `your-agentic-agent-id` with the ID of the new agent you just created.
+</Note>
+
+When you run this script, the agent receives the question, understands from its persona that it needs to search for information, calls the `search_research_papers` tool, gets the context, and then formulates an answer. All the RAG logic is handled by the agent, not your application.
+
+## Which Approach Is Right for You?
+
+We've explored two powerful methods for connecting a custom RAG pipeline to a Letta agent. The best choice depends on your specific needs.
+
+- **Use Standard RAG when...**
+  - You want to maintain complete, fine-grained control over the retrieval process
+  - Your retrieval logic is complex and better handled by your application code
+  - You want to keep your agent as simple as possible and minimize its autonomy
+
+- **Use Agentic RAG when...**
+  - You want to build a more autonomous agent that can handle complex, multi-step queries
+  - You prefer simpler, cleaner client-side code
+  - You want the agent to decide *when* and *what* to search for, leading to more dynamic conversations
+
+## What's Next?
+
+Now that you've integrated a custom RAG pipeline, you can expand on this foundation. Here are a few ideas:
+
+<AccordionGroup>
+<Accordion title="Switch Between Vector Databases">
+All three vector databases (ChromaDB, MongoDB Atlas, and Qdrant) follow the same core pattern: connect, create embeddings, query, and return results. You can switch between them by updating your credentials and changing the database client code, while keeping the rest of your application architecture unchanged.
+</Accordion>
+
+<Accordion title="Build More Complex Tools">
+Create tools that not only read from your database but also write new information to it. This would allow your agent to learn from its interactions and update its own knowledge base over time.
+</Accordion>
+
+<Accordion title="Add More Data Sources">
+Expand your RAG pipeline to include more documents, web pages, or other sources of information. The more comprehensive your data source, the more capable your agent will become.
+</Accordion>
+
+<Accordion title="Implement Hybrid Search">
+Combine vector search with traditional keyword search to improve retrieval accuracy. MongoDB Atlas and Qdrant both support filtering and metadata search alongside vector similarity.
+</Accordion>
+</AccordionGroup>
