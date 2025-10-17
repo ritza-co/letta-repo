@@ -613,6 +613,10 @@ navigation:
         contents:
           - page: Building customer-specific relationship agents
             path: pages/tutorials/customer-specific-agents.mdx
+      - section: RAG
+        contents:
+          - page: Choose your RAG Database
+            path: cookbooks/choose-your-rag-database.mdx
 
   - tab: leaderboard
     layout:
