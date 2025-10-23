@@ -607,8 +607,8 @@ navigation:
             path: pages/cookbooks_simple.mdx
       - section: Multi-Agent
         contents:
-          - page: Async Multi-Agent
-            path: pages/tutorials/multiagent_async.mdx
+          - page: Multi-Agent Shared Memory
+            path: pages/cookbooks/multi-agent-shared-memory.mdx
       - section: Agent Templates
         contents:
           - page: Building customer-specific relationship agents
