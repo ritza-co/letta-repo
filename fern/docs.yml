@@ -415,6 +415,8 @@ navigation:
         #  path: pages/server/pip.mdx
         - page: Database Configuration
           path: pages/selfhosting/postgres.mdx
+        - page: Amazon Aurora PostgreSQL
+          path: pages/selfhosting/aws-aurora.mdx
         - page: Performance
           path: pages/selfhosting/performance.mdx
         - page: pgadmin
