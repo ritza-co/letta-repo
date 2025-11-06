@@ -206,6 +206,8 @@ navigation:
         contents:
           - page: Telegram Bot
             path: pages/tutorials/telegram_bot.mdx
+          - page: Full-Stack App with Supabase
+            path: pages/integrations/supabase.mdx
 
       - section: Research Background
         contents:
