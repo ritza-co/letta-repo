@@ -605,6 +605,10 @@ navigation:
         contents:
           - page: Overview
             path: pages/cookbooks_simple.mdx
+      - section: Integrations
+        contents:
+          - page: Build a Full-Stack App with Letta and Supabase
+            path: pages/cookbooks/supabase-fullstack.mdx
       - section: Multi-Agent
         contents:
           - page: Async Multi-Agent

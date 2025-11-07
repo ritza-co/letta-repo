@@ -1,0 +1,1342 @@
+---
+title: Build a Multi-User Chatbot with Letta, Supabase, and Next.js
+subtitle: Add persistent storage and user management to a streaming AI chatbot
+slug: cookbooks/integrations/supabase
+---
+
+When building with Letta, you need to understand where it fits in your stack. Letta is an AI runtime that manages agent memory and conversations. This guide shows you how Letta integrates with your UI layer (Next.js) and database (Supabase) to build a complete application architecture.
+
+You'll take Letta's Next.js chatbot example, which has no backend, and add Supabase to create a production-ready application with persistent storage and multi-user support. By the end, you'll understand how each piece works together.
+
+Here's what we'll build:
+
+![Multi-user Letta chatbot with Supabase persistence](/images/letta-supabase/app-demo.png)
+
+We'll cover:
+
+- Setting up Supabase with a schema for users, agents, and messages
+- Using Letta Identities to associate agents with specific users
+- Streaming responses with Vercel AI SDK while persisting to Supabase
+- Building a user manager that keeps Supabase and Letta in sync
+
+## Prerequisites
+
+To follow this guide, you need:
+
+- Node.js 18+ installed
+- A [Letta Cloud](https://app.letta.com) account (free tier works)
+- A [Supabase](https://supabase.com) account (free tier works)
+- Basic familiarity with Next.js, React, and TypeScript
+
+We'll start with [Letta's chatbot example](https://github.com/letta-ai/letta-chatbot-example) and integrate Supabase step by step.
+
+## Understanding the architecture
+
+Before building, you need to understand how each piece of the stack works together.
+
+![Architecture diagram showing data flow](/images/letta-supabase/architecture-diagram.png)
+
+<AccordionGroup>
+<Accordion title="Next.js">
+Next.js provides the frontend UI and API routes. The UI displays the chat interface. The API routes act as the backend layer that coordinates between Letta and Supabase.
+</Accordion>
+
+<Accordion title="Vercel AI SDK">
+Vercel AI SDK handles streaming responses from Letta to the frontend. When a user sends a message, the SDK streams the AI response token by token, giving users real-time feedback.
+</Accordion>
+
+<Accordion title="Letta">
+Letta is the AI runtime. It manages your agents, their memory, and conversation state. When you create an agent or send a message, Letta processes it and maintains the agent's memory across conversations.
+</Accordion>
+
+<Accordion title="Supabase">
+Supabase is your database. It stores user accounts, agent metadata (like names and settings), and message history. This gives you queryable data that persists across sessions.
+</Accordion>
+</AccordionGroup>
+
+These layers communicate in a specific order. The frontend talks to Next.js API routes. The API routes talk to both Letta (for AI processing) and Supabase (for data storage). Letta and Supabase don't talk directly to each other. Your API routes coordinate between them.
+
+## Clone the starter project
+
+Clone the Letta chatbot example repository:
+
+```bash
+git clone https://github.com/letta-ai/letta-chatbot-example.git
+cd letta-chatbot-example
+```
+
+Install dependencies:
+
+```bash
+npm install
+```
+
+Install the Supabase JavaScript client:
+
+```bash
+npm install @supabase/supabase-js
+```
+
+Update the default agent configuration to use models compatible with Letta Cloud. Open `default-agent.json` in the project root and change the model settings:
+
+```json title="default-agent.json"
+  "DEFAULT_LLM": "letta/letta-free",
+  "DEFAULT_EMBEDDING": "letta/letta-free"
+```
+
+To:
+
+```json title="default-agent.json"
+  "DEFAULT_LLM": "openai/gpt-4o-mini",
+  "DEFAULT_EMBEDDING": "openai/text-embedding-ada-002"
+```
+
+The `letta/letta-free` model isn't available on Letta Cloud. Letta Cloud requires the `provider/model` format (like `openai/gpt-4o-mini`).
+
+This starter project already has a working chatbot interface built with Next.js and the Vercel AI SDK. It uses Letta to create agents and have conversations, but lacks persistent storage and multi-user support. We'll add those features by integrating Supabase.
+
+## Getting your API keys
+
+Before we integrate Supabase, we need API keys for both Letta and Supabase.
+
+<AccordionGroup>
+<Accordion title="Get your Letta API Key">
+<Steps>
+  <Step title="Create a Letta Account">
+    If you don't have one, sign up for a free account at [letta.com](https://www.letta.com).
+  </Step>
+  <Step title="Navigate to API Keys">
+    Once logged in, click on **API keys** in the sidebar.
+
+    ![Letta API Key Navigation](/images/letta-supabase/letta-api-key-nav.png)
+  </Step>
+  <Step title="Create and Copy Your Key">
+    Click **+ Create API key**, give it a descriptive name, and click **Confirm**. Copy the key and save it somewhere safe.
+  </Step>
+</Steps>
+</Accordion>
+
+<Accordion title="Get your Supabase credentials">
+<Steps>
+  <Step title="Create a Supabase Project">
+    Go to [your Supabase dashboard](https://supabase.com/dashboard/) and click **+ New project**. Choose a project name, database password, and region. Wait for the project to finish setting up (this takes about two minutes).
+  </Step>
+  <Step title="Get Your API Credentials">
+    Once your project is ready, click **Connect** in the top navigation, then select the **App Frameworks** tab. You'll see your connection details:
+
+    Copy the **values** (not the environment variable names) for:
+    1. **Project URL** (the URL after `NEXT_PUBLIC_SUPABASE_URL=`)
+    2. **Anon Key** (the key after `NEXT_PUBLIC_SUPABASE_ANON_KEY=`)
+
+    ![Supabase API credentials](/images/letta-supabase/supabase-api-credentials.png)
+
+    You'll need both to configure your application.
+  </Step>
+</Steps>
+</Accordion>
+</AccordionGroup>
+
+In your project root, copy the environment template:
+
+```bash
+cp .env.template .env
+```
+
+Open `.env` and add your Supabase credentials:
+
+```bash title=".env"
+# Letta settings
+LETTA_API_KEY=your_letta_api_key_here
+LETTA_BASE_URL=https://api.letta.com
+
+# Authentication settings
+USE_COOKIE_BASED_AUTHENTICATION=true
+NEXT_PUBLIC_CREATE_AGENTS_FROM_UI=true
+
+# Supabase settings
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_ANON_KEY=your_supabase_anon_key_here
+```
+
+Replace `your_letta_api_key_here` with your Letta API key from [app.letta.com](https://app.letta.com), and update the Supabase values with your project URL and anon key.
+
+<Note>
+This guide uses Letta Cloud, not a local Letta server. Make sure to set `LETTA_BASE_URL` to `https://api.letta.com` (the default in the cloned project points to localhost).
+</Note>
+
+## Creating the database schema
+
+We need three tables: one for users, one for agent metadata, and one for message history. In your Supabase dashboard, go to the **SQL Editor** and click **New query**.
+
+Paste this schema:
+
+```sql title="supabase-schema.sql"
+-- Table: users
+-- Stores user information and links to Letta Identities
+CREATE TABLE users (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  cookie_uid TEXT NOT NULL UNIQUE,
+  letta_identity_id TEXT NOT NULL UNIQUE,
+  name TEXT,
+  email TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Table: agents
+-- Stores metadata about Letta agents
+CREATE TABLE agents (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  letta_agent_id TEXT NOT NULL UNIQUE,
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  persona TEXT,
+  human_block TEXT,
+  model TEXT NOT NULL DEFAULT 'openai/gpt-4o-mini',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Table: messages
+-- Stores chat messages between users and agents
+CREATE TABLE messages (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  agent_id UUID NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+  letta_message_id TEXT,
+  role TEXT NOT NULL CHECK (role IN ('user', 'assistant', 'system')),
+  content TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Indexes for performance
+CREATE INDEX idx_users_cookie_uid ON users(cookie_uid);
+CREATE INDEX idx_users_letta_identity_id ON users(letta_identity_id);
+CREATE INDEX idx_agents_user_id ON agents(user_id);
+CREATE INDEX idx_agents_letta_agent_id ON agents(letta_agent_id);
+CREATE INDEX idx_messages_agent_id ON messages(agent_id);
+CREATE INDEX idx_messages_created_at ON messages(created_at DESC);
+
+-- Function to update updated_at timestamp
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+-- Triggers to automatically update updated_at
+CREATE TRIGGER update_users_updated_at
+    BEFORE UPDATE ON users
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_agents_updated_at
+    BEFORE UPDATE ON agents
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+```
+
+Click **Run** to execute the schema. You should see "Success. No rows returned" in the results panel.
+
+The schema creates a clear separation between Supabase and Letta responsibilities:
+
+<AccordionGroup>
+<Accordion title="The users table">
+- `cookie_uid` - Stores the anonymous session ID from the user's browser cookie
+- `letta_identity_id` - Links to the corresponding Identity object in Letta
+- Maps browser sessions to Letta Identities so we know which Identity belongs to which session
+</Accordion>
+
+<Accordion title="The agents table">
+- `letta_agent_id` - Links to the actual agent in Letta (manages memory and conversation state)
+- `user_id` - Foreign key that associates each agent with its creator
+- `name`, `persona`, `model` - Metadata stored in Supabase for quick queries (displaying agent lists, filtering, etc.)
+</Accordion>
+
+<Accordion title="The messages table">
+- `agent_id` - Foreign key that links messages to agents
+- `ON DELETE CASCADE` - Deleting an agent automatically deletes all its messages
+- Provides queryable chat history while Letta manages the live conversation state
+- Stores every message for analytics, search, and history retrieval
+</Accordion>
+
+<Accordion title="Performance indexes">
+- `cookie_uid` and `letta_identity_id` - Indexed because we look up users by these values frequently
+- `messages.agent_id` - Indexed for querying messages by agent
+- `messages.created_at` - Indexed for sorting messages by time
+</Accordion>
+</AccordionGroup>
+
+## Creating the Supabase client
+
+Create a new file to initialize the Supabase client. This client will be imported throughout your application for database operations.
+
+Create `src/config/supabase-client.ts`:
+
+```typescript title="src/config/supabase-client.ts"
+import { createClient } from '@supabase/supabase-js'
+
+const SUPABASE_URL = process.env.SUPABASE_URL
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY
+
+if (!SUPABASE_URL) {
+  throw new Error(
+    'SUPABASE_URL is not set. Please add it to your .env file.'
+  )
+}
+
+if (!SUPABASE_ANON_KEY) {
+  throw new Error(
+    'SUPABASE_ANON_KEY is not set. Please add it to your .env file.'
+  )
+}
+
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+
+console.log('Supabase client initialized')
+```
+
+This file reads your environment variables and creates a Supabase client. The error checks ensure you'll see a clear message if credentials are missing. Next.js automatically loads `.env` files, so we don't need additional configuration.
+
+## Building the Supabase service layer
+
+The service layer wraps database operations in TypeScript functions. This keeps your API routes clean and makes database queries reusable.
+
+Create `src/services/supabase-service.ts` and start with user operations:
+
+```typescript title="src/services/supabase-service.ts"
+import { supabase } from '@/config/supabase-client'
+
+// ==================== User Operations ====================
+
+export interface CreateUserData {
+  cookieUid: string
+  lettaIdentityId: string
+  name?: string
+  email?: string
+}
+
+export interface User {
+  id: string
+  cookie_uid: string
+  letta_identity_id: string
+  name: string | null
+  email: string | null
+  created_at: string
+  updated_at: string
+}
+
+export async function createUser(userData: CreateUserData): Promise<User> {
+  const { cookieUid, lettaIdentityId, name, email } = userData
+
+  const { data, error } = await supabase
+    .from('users')
+    .insert([
+      {
+        cookie_uid: cookieUid,
+        letta_identity_id: lettaIdentityId,
+        name: name || null,
+        email: email || null
+      }
+    ])
+    .select()
+    .single()
+
+  if (error) {
+    throw new Error(`Failed to create user: ${error.message}`)
+  }
+
+  console.log(`Created user in Supabase: ${data.id}`)
+  return data
+}
+
+export async function getUserByCookieUid(cookieUid: string): Promise<User | null> {
+  const { data, error } = await supabase
+    .from('users')
+    .select('*')
+    .eq('cookie_uid', cookieUid)
+    .single()
+
+  if (error) {
+    if (error.code === 'PGRST116') {
+      return null
+    }
+    throw new Error(`Failed to fetch user: ${error.message}`)
+  }
+
+  return data
+}
+```
+
+The `createUser` function inserts a new user row with links to both the cookie UID and Letta Identity. The `getUserByCookieUid` function retrieves a user by their session cookie. The special error code `PGRST116` means "no rows returned", which we handle by returning `null` instead of throwing an error.
+
+Continue the service file with agent operations. Add this to the same file:
+
+```typescript title="src/services/supabase-service.ts"
+// ==================== Agent Operations ====================
+
+export interface CreateAgentData {
+  lettaAgentId: string
+  userId: string
+  name: string
+  persona?: string
+  humanBlock?: string
+  model: string
+}
+
+export interface Agent {
+  id: string
+  letta_agent_id: string
+  user_id: string
+  name: string
+  persona: string | null
+  human_block: string | null
+  model: string
+  created_at: string
+  updated_at: string
+}
+
+export async function createAgent(agentData: CreateAgentData): Promise<Agent> {
+  const { lettaAgentId, userId, name, persona, humanBlock, model } = agentData
+
+  const { data, error } = await supabase
+    .from('agents')
+    .insert([
+      {
+        letta_agent_id: lettaAgentId,
+        user_id: userId,
+        name,
+        persona: persona || null,
+        human_block: humanBlock || null,
+        model
+      }
+    ])
+    .select()
+    .single()
+
+  if (error) {
+    throw new Error(`Failed to create agent: ${error.message}`)
+  }
+
+  console.log(`Created agent in Supabase: ${data.id}`)
+  return data
+}
+
+export async function getAgentsByUserId(userId: string): Promise<Agent[]> {
+  const { data, error } = await supabase
+    .from('agents')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+
+  if (error) {
+    throw new Error(`Failed to fetch agents: ${error.message}`)
+  }
+
+  return data
+}
+
+export async function getAgentByLettaId(lettaAgentId: string): Promise<Agent | null> {
+  const { data, error } = await supabase
+    .from('agents')
+    .select('*')
+    .eq('letta_agent_id', lettaAgentId)
+    .single()
+
+  if (error) {
+    if (error.code === 'PGRST116') {
+      return null
+    }
+    throw new Error(`Failed to fetch agent: ${error.message}`)
+  }
+
+  return data
+}
+
+export async function deleteAgent(agentId: string): Promise<void> {
+  const { error } = await supabase
+    .from('agents')
+    .delete()
+    .eq('id', agentId)
+
+  if (error) {
+    throw new Error(`Failed to delete agent: ${error.message}`)
+  }
+
+  console.log(`Deleted agent from Supabase: ${agentId}`)
+}
+```
+
+These functions manage agent metadata in Supabase. Notice `getAgentByLettaId` looks up agents using the Letta agent ID, which is how we link our Supabase records to agents in Letta.
+
+Finally, add message operations to the same file:
+
+```typescript title="src/services/supabase-service.ts"
+// ==================== Message Operations ====================
+
+export interface CreateMessageData {
+  agentId: string
+  lettaMessageId?: string
+  role: 'user' | 'assistant' | 'system'
+  content: string
+}
+
+export interface Message {
+  id: string
+  agent_id: string
+  letta_message_id: string | null
+  role: string
+  content: string
+  created_at: string
+}
+
+export async function createMessages(messages: CreateMessageData[]): Promise<Message[]> {
+  const rows = messages.map((msg) => ({
+    agent_id: msg.agentId,
+    letta_message_id: msg.lettaMessageId || null,
+    role: msg.role,
+    content: msg.content
+  }))
+
+  const { data, error } = await supabase
+    .from('messages')
+    .insert(rows)
+    .select()
+
+  if (error) {
+    throw new Error(`Failed to create messages: ${error.message}`)
+  }
+
+  console.log(`Created ${data.length} messages in Supabase`)
+  return data
+}
+
+export async function getMessagesByAgentId(agentId: string): Promise<Message[]> {
+  const { data, error } = await supabase
+    .from('messages')
+    .select('*')
+    .eq('agent_id', agentId)
+    .order('created_at', { ascending: true })
+
+  if (error) {
+    throw new Error(`Failed to fetch messages: ${error.message}`)
+  }
+
+  return data
+}
+```
+
+The `createMessages` function accepts an array for batch inserts, which is more efficient when storing both user and assistant messages from a single conversation turn.
+
+## Creating the Letta Identity service
+
+Letta Identities are how Letta manages multi-user applications. An Identity represents a user in your application and links them to their agents. Each Identity has an `id` (generated by Letta), an `identifier_key` (your application's user identifier), a `name` (human-readable label), and an `identity_type` (usually "user").
+
+When you create an agent, you pass `identityIds` to associate it with specific users. Later, you can list agents by filtering with `identifierKeys`.
+
+Create `src/services/letta-identity-service.ts`:
+
+```typescript title="src/services/letta-identity-service.ts"
+import client from '@/config/letta-client'
+
+export interface CreateIdentityData {
+  identifierKey: string
+  name?: string
+  identityType?: 'user' | 'agent' | 'system'
+}
+
+export interface LettaIdentity {
+  id: string
+  identifier_key: string
+  name: string | null
+  identity_type: string
+  agent_ids: string[]
+}
+
+export async function createIdentity(
+  identityData: CreateIdentityData
+): Promise<LettaIdentity> {
+  const { identifierKey, name, identityType = 'user' } = identityData
+
+  try {
+    const identity = await client.identities.create({
+      identifierKey,
+      name: name || identifierKey,
+      identityType
+    })
+
+    console.log(`Created Letta Identity: ${identity.id} for ${identifierKey}`)
+    return identity as LettaIdentity
+  } catch (error) {
+    console.error('Error creating Letta Identity:', error)
+    throw new Error(`Failed to create Letta Identity: ${error}`)
+  }
+}
+
+export async function getIdentityByKey(identifierKey: string): Promise<LettaIdentity | null> {
+  try {
+    const identities = await client.identities.list()
+    const identity = identities.find((i) => i.identifierKey === identifierKey)
+    return identity ? (identity as LettaIdentity) : null
+  } catch (error) {
+    console.error('Error fetching Letta Identities:', error)
+    return null
+  }
+}
+
+export async function getOrCreateIdentity(
+  identifierKey: string,
+  name?: string
+): Promise<LettaIdentity> {
+  const existing = await getIdentityByKey(identifierKey)
+
+  if (existing) {
+    return existing
+  }
+
+  return createIdentity({ identifierKey, name })
+}
+```
+
+The `getOrCreateIdentity` helper function checks if an Identity exists before creating a new one. This makes it idempotent, we can call it multiple times safely.
+
+## Creating the user manager
+
+The user manager coordinates between Supabase and Letta to keep both systems in sync. When a user visits your app, the middleware calls this function to ensure they exist in both systems.
+
+Create `src/lib/user-manager.ts`:
+
+```typescript title="src/lib/user-manager.ts"
+import * as supabaseService from '@/services/supabase-service'
+import * as lettaIdentityService from '@/services/letta-identity-service'
+
+export interface UserData {
+  supabaseUserId: string
+  lettaIdentityId: string
+  cookieUid: string
+  isNewUser: boolean
+}
+
+export async function getOrCreateUser(cookieUid: string): Promise<UserData> {
+  // Check if user already exists in Supabase
+  const existingUser = await supabaseService.getUserByCookieUid(cookieUid)
+
+  if (existingUser) {
+    return {
+      supabaseUserId: existingUser.id,
+      lettaIdentityId: existingUser.letta_identity_id,
+      cookieUid: existingUser.cookie_uid,
+      isNewUser: false
+    }
+  }
+
+  // User doesn't exist, create in both systems
+  console.log(`Creating new user for cookie: ${cookieUid}`)
+
+  try {
+    // Create Letta Identity first
+    const lettaIdentity = await lettaIdentityService.getOrCreateIdentity(
+      cookieUid,
+      `User ${cookieUid.substring(0, 8)}`
+    )
+
+    // Create user in Supabase with Letta Identity reference
+    const supabaseUser = await supabaseService.createUser({
+      cookieUid,
+      lettaIdentityId: lettaIdentity.id,
+      name: lettaIdentity.name || undefined
+    })
+
+    console.log(
+      `Created new user: Supabase ID ${supabaseUser.id}, Letta Identity ${lettaIdentity.id}`
+    )
+
+    return {
+      supabaseUserId: supabaseUser.id,
+      lettaIdentityId: lettaIdentity.id,
+      cookieUid: supabaseUser.cookie_uid,
+      isNewUser: true
+    }
+  } catch (error) {
+    console.error('Failed to create user:', error)
+    throw new Error(`User creation failed: ${error}`)
+  }
+}
+```
+
+This function creates the Identity in Letta first, then stores the user in Supabase with the Identity ID. The order matters because we need the Identity ID to create the Supabase user record. If the user already exists, we return their data immediately without making any API calls to Letta.
+
+## Connecting middleware to user management
+
+The middleware runs on every request and uses the user manager to ensure users exist in both systems. This happens before any API routes execute.
+
+<Steps>
+  <Step title="Add the import">
+    Open `src/middleware.ts` and add the import at the top with the other imports:
+
+    ```typescript title="src/middleware.ts"
+    import { getOrCreateUser } from '@/lib/user-manager'
+    ```
+  </Step>
+
+  <Step title="Make the function async">
+    Change the function declaration from `function` to `async function`:
+
+    ```typescript title="src/middleware.ts"
+    export async function middleware(request: NextRequest) {
+    ```
+  </Step>
+
+  <Step title="Add user management logic">
+    Add this code after the closing brace `}` of the cookie setup block, just before the final `return response`:
+
+    ```typescript title="src/middleware.ts"
+    // Ensure user exists in Supabase + Letta
+    // This creates the user if they don't exist yet
+    try {
+      const userData = await getOrCreateUser(lettaUid)
+
+      // Attach user data to request headers
+      // API routes can access this data without additional DB queries
+      response.headers.set('x-user-id', userData.supabaseUserId)
+      response.headers.set('x-letta-identity-id', userData.lettaIdentityId)
+      response.headers.set('x-cookie-uid', userData.cookieUid)
+
+      // Optional: Log new user creation
+      if (userData.isNewUser) {
+        console.log(`New user created: ${userData.supabaseUserId}`)
+      }
+    } catch (error) {
+      console.error('Middleware: Failed to setup user:', error)
+      // Continue anyway - API routes will handle missing headers
+      // This prevents the entire app from breaking if Supabase/Letta is down
+    }
+    ```
+
+    The middleware calls `getOrCreateUser()` which handles the Supabase and Letta Identity creation. The user data gets attached to request headers, making it available to all API routes without additional database queries.
+  </Step>
+</Steps>
+
+The middleware changes you just made create an import chain that pulls in `letta-client.ts`. That file contains `dotenv` code, which causes an Edge Runtime error. Open `src/config/letta-client.ts` and remove these lines:
+
+```typescript
+import { config } from 'dotenv'
+
+config()
+```
+
+Next.js automatically loads `.env` files, so this doesn't affect functionality.
+
+## Integrating agents with Identities
+
+Now we'll modify the agent routes to use Letta Identities instead of tags. The starter project uses tags for user identification (checking `agent.tags.includes('user:${userId}')`), but Identities provide better multi-user support.
+
+<Steps>
+  <Step title="Add Supabase import to helpers">
+    Open `src/app/(server)/api/agents/helpers.ts` and add the Supabase import after the existing imports:
+
+    ```typescript title="src/app/(server)/api/agents/helpers.ts"
+    import * as supabaseService from '@/services/supabase-service'
+    ```
+  </Step>
+
+  <Step title="Add getUserFromRequest function">
+    Add a new `getUserFromRequest()` function before the `validateAgentOwner()` function:
+
+    ```typescript title="src/app/(server)/api/agents/helpers.ts"
+    export interface UserData {
+      supabaseUserId: string
+      lettaIdentityId: string
+      cookieUid: string
+    }
+
+    /**
+     * Get user data from request headers (set by middleware)
+     */
+    export function getUserFromRequest(req: NextRequest): UserData | null {
+      if (!USE_COOKIE_BASED_AUTHENTICATION) {
+        return {
+          supabaseUserId: 'default',
+          lettaIdentityId: 'default',
+          cookieUid: 'default'
+        }
+      }
+
+      const supabaseUserId = req.headers.get('x-user-id')
+      const lettaIdentityId = req.headers.get('x-letta-identity-id')
+      const cookieUid = req.headers.get('x-cookie-uid')
+
+      if (!supabaseUserId || !lettaIdentityId || !cookieUid) {
+        return null
+      }
+
+      return {
+        supabaseUserId,
+        lettaIdentityId,
+        cookieUid
+      }
+    }
+    ```
+
+    This function extracts the user data that middleware attached to request headers.
+  </Step>
+
+  <Step title="Update validateAgentOwner function">
+    In the `validateAgentOwner()` function, find this section:
+
+    ```typescript
+    const userId = getUserId(req)
+    if (!userId) {
+      return NextResponse.json({ error: 'User ID is required' }, { status: 400 })
+    }
+    ```
+
+    Replace it with:
+
+    ```typescript
+    const user = getUserFromRequest(req)
+    if (!user) {
+      return NextResponse.json({ error: 'User authentication required' }, { status: 401 })
+    }
+    ```
+
+    Then find this part that checks tags:
+
+    ```typescript
+    if (!agent.tags.includes(`user:${userId}`)) {
+      return NextResponse.json({ error: 'Agent not found' }, { status: 404 })
+    }
+    ```
+
+    Replace it with Supabase ownership verification:
+
+    ```typescript
+    // Verify ownership via Supabase
+    const agentMetadata = await supabaseService.getAgentByLettaId(agentId)
+    if (!agentMetadata || agentMetadata.user_id !== user.supabaseUserId) {
+      return NextResponse.json({ error: 'Agent not found' }, { status: 404 })
+    }
+    ```
+
+    Finally, update the return statement from:
+
+    ```typescript
+    return {
+      userId: userId,
+      agentId: agentId,
+      agent: agent
+    }
+    ```
+
+    To:
+
+    ```typescript
+    return {
+      userId: user.supabaseUserId,
+      agentId: agentId,
+      agent: agent,
+      user: user
+    }
+    ```
+  </Step>
+
+  <Step title="Remove getUserTagId function">
+    Find and delete the `getUserTagId()` function entirely, since we're no longer using tags:
+
+    ```typescript
+    export function getUserTagId(userId: string) {
+      if (!USE_COOKIE_BASED_AUTHENTICATION) {
+        return []
+      }
+      return [`user:${userId}`]
+    }
+    ```
+
+    The helper functions now check ownership through Supabase instead of checking Letta agent tags.
+  </Step>
+</Steps>
+
+### Creating agents with Identities
+
+Now we'll update the agent routes to use Identities instead of tags.
+
+<Steps>
+  <Step title="Update imports in agent routes">
+    Open `src/app/(server)/api/agents/route.ts` and change the imports at the top from:
+
+    ```typescript
+    import { getUserTagId, getUserId } from './helpers'
+    ```
+
+    To:
+
+    ```typescript
+    import { getUserFromRequest } from './helpers'
+    import * as supabaseService from '@/services/supabase-service'
+    ```
+  </Step>
+
+  <Step title="Update getAgents function">
+    In the `getAgents` function, replace the user ID check:
+
+    ```typescript
+    const userId = getUserId(req)
+    if (!userId) {
+      return NextResponse.json({ error: 'User ID is required' }, { status: 400 })
+    }
+    ```
+
+    With:
+
+    ```typescript
+    const user = getUserFromRequest(req)
+    if (!user) {
+      return NextResponse.json({ error: 'User authentication required' }, { status: 401 })
+    }
+    ```
+
+    Then replace the agent listing logic that uses tags:
+
+    ```typescript
+    const agents = await client.agents.list({
+      tags: getUserTagId(userId),
+      matchAllTags: true,
+    })
+    ```
+
+    With Identity-based filtering:
+
+    ```typescript
+    // Fetch agents from Letta using Identity
+    const agents = await client.agents.list({
+      identifierKeys: [user.cookieUid]
+    })
+    ```
+
+    This lists only agents associated with the user's Identity.
+  </Step>
+
+  <Step title="Update createAgent function">
+    In the `createAgent` function, replace the user ID check:
+
+    ```typescript
+    const userId = getUserId(req)
+    if (!userId) {
+      return NextResponse.json({ error: 'User ID is required' }, { status: 400 })
+    }
+    ```
+
+    With:
+
+    ```typescript
+    const user = getUserFromRequest(req)
+    if (!user) {
+      return NextResponse.json({ error: 'User authentication required' }, { status: 401 })
+    }
+    ```
+
+    Then replace the agent creation that uses tags:
+
+    ```typescript
+    const newAgent = await client.agents.create({
+      memoryBlocks: DEFAULT_MEMORY_BLOCKS,
+      model: DEFAULT_LLM,
+      embedding: DEFAULT_EMBEDDING,
+      tags: getUserTagId(userId)
+    })
+
+    return NextResponse.json(newAgent)
+    ```
+
+    With Identity-based creation and Supabase storage:
+
+    ```typescript
+    // Step 1: Create agent in Letta with Identity
+    const newAgent = await client.agents.create({
+      memoryBlocks: DEFAULT_MEMORY_BLOCKS,
+      model: DEFAULT_LLM,
+      embedding: DEFAULT_EMBEDDING,
+      identityIds: [user.lettaIdentityId]
+    })
+
+    // Step 2: Store agent metadata in Supabase
+    const personaBlock = DEFAULT_MEMORY_BLOCKS.find(b => b.label === 'persona')
+    const humanBlock = DEFAULT_MEMORY_BLOCKS.find(b => b.label === 'human')
+
+    await supabaseService.createAgent({
+      lettaAgentId: newAgent.id,
+      userId: user.supabaseUserId,
+      name: newAgent.name || 'New Agent',
+      persona: personaBlock?.value,
+      humanBlock: humanBlock?.value,
+      model: DEFAULT_LLM
+    })
+
+    console.log(`Agent created: Letta ID ${newAgent.id}, Supabase metadata stored`)
+
+    return NextResponse.json(newAgent)
+    ```
+
+    This creates the agent in Letta with `identityIds` to link it to the user's Identity, then stores metadata in Supabase. The Supabase record includes the `letta_agent_id` to link back to Letta and the `user_id` for ownership tracking.
+  </Step>
+</Steps>
+
+### Deleting agents from both systems
+
+When a user deletes an agent, we need to remove it from both Letta and Supabase.
+
+<Steps>
+  <Step title="Add Supabase import">
+    Open `src/app/(server)/api/agents/[agentId]/route.ts` and add the Supabase import after the existing imports:
+
+    ```typescript
+    import * as supabaseService from '@/services/supabase-service'
+    ```
+  </Step>
+
+  <Step title="Update deleteAgentById function">
+    In the `deleteAgentById` function, find this line:
+
+    ```typescript
+    await client.agents.delete(agentId)
+    return NextResponse.json({ message: 'Agent deleted successfully' })
+    ```
+
+    Replace it with:
+
+    ```typescript
+    // Step 1: Delete from Letta
+    await client.agents.delete(agentId)
+
+    // Step 2: Delete metadata from Supabase (cascades to messages)
+    await supabaseService.deleteAgent(agentId)
+
+    console.log(`Agent deleted: Letta ID ${agentId} and Supabase metadata`)
+
+    return NextResponse.json({ message: 'Agent deleted successfully' })
+    ```
+
+    This removes the agent from both systems. The `ON DELETE CASCADE` constraint in your database schema automatically deletes all associated messages when the agent metadata is removed.
+  </Step>
+</Steps>
+
+## Streaming messages with persistence
+
+The message route handles streaming responses from Letta while persisting the conversation to Supabase. The Vercel AI SDK provides the streaming infrastructure, and we'll add persistence that doesn't interfere with the real-time UX.
+
+<Steps>
+  <Step title="Add Supabase imports">
+    Open `src/app/(server)/api/agents/[agentId]/messages/route.ts` and add the Supabase imports at the top:
+
+    ```typescript
+    import { getAgentByLettaId, createMessages } from '@/services/supabase-service'
+    ```
+  </Step>
+
+  <Step title="Look up the Supabase agent">
+    In the `sendMessage` function, find the line where we extract messages from the request:
+
+    ```typescript
+    const { messages } = await req.json()
+    ```
+
+    Right after this line, add code to look up the Supabase agent:
+
+    ```typescript
+    // Get Supabase agent to store messages
+    const supabaseAgent = await getAgentByLettaId(agentId)
+    if (!supabaseAgent) {
+      console.warn(`Agent ${agentId} not found in Supabase, skipping message persistence`)
+    }
+    ```
+
+    This looks up the agent metadata we stored earlier. If it's not found, we log a warning but continue with the chat (graceful degradation).
+  </Step>
+
+  <Step title="Add onFinish callback to streamText">
+    Find the `streamText()` call:
+
+    ```typescript
+    const result = streamText({
+      model: letta(),
+      providerOptions: {
+        agent: {
+          id: agentId
+        }
+      },
+      messages: convertToModelMessages(messages)
+    })
+    ```
+
+    Add an `onFinish` callback to persist messages after streaming completes:
+
+    ```typescript title="src/app/(server)/api/agents/[agentId]/messages/route.ts"
+    const result = streamText({
+      model: letta(),
+      providerOptions: {
+        agent: {
+          id: agentId
+        }
+      },
+      messages: convertToModelMessages(messages),
+      async onFinish({ text }) {
+        // Persist messages to Supabase after streaming completes
+        if (supabaseAgent) {
+          try {
+            const userMessage = messages[messages.length - 1]
+
+            // Extract content from message structure
+            // Vercel AI SDK messages have a parts array with text content
+            let userContent = ''
+            if (typeof userMessage === 'string') {
+              userContent = userMessage
+            } else if (userMessage.content) {
+              userContent = userMessage.content
+            } else if (userMessage.parts && Array.isArray(userMessage.parts)) {
+              // Extract text from parts array
+              userContent = userMessage.parts
+                .filter((part: any) => part.type === 'text')
+                .map((part: any) => part.text)
+                .join('')
+            }
+
+            await createMessages([
+              {
+                agentId: supabaseAgent.id,
+                role: 'user',
+                content: userContent
+              },
+              {
+                agentId: supabaseAgent.id,
+                role: 'assistant',
+                content: text
+              }
+            ])
+
+            console.log(`Persisted conversation to Supabase for agent ${agentId}`)
+          } catch (error) {
+            console.error('Failed to persist messages to Supabase:', error)
+            // Don't fail the request, just log the error
+          }
+        }
+      }
+    })
+    ```
+  </Step>
+</Steps>
+
+The `onFinish` callback runs after the streaming response completes. This is the perfect time to persist messages because:
+
+1. **The user already saw the response** - They got real-time streaming UX
+2. **We have the complete assistant message** - The `text` parameter contains the full response
+3. **Database writes don't block the stream** - Persistence happens asynchronously
+
+The content extraction logic handles different message formats from the Vercel AI SDK. Messages can be strings, objects with a `content` property, or objects with a `parts` array. We check for all three formats to reliably extract the user's message text.
+
+We use `createMessages()` with an array to insert both messages in a single database transaction, which is more efficient than two separate inserts.
+
+If persistence fails, we log the error but don't throw it. This ensures the chat continues working even if Supabase is temporarily unavailable.
+
+## Testing the application
+
+Now that all the integration code is in place, let's test the complete flow. Start the development server:
+
+```bash
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) in your browser. You should see the chatbot interface.
+
+![Chatbot interface on first load](/images/letta-supabase/app-first-load.png)
+
+<Steps>
+  <Step title="Test user creation">
+    Open your browser's developer tools and check the Network tab. Refresh the page and look for requests to your API routes. In the terminal where your dev server is running, you should see logs like:
+
+    ```
+    Supabase client initialized
+    Created Letta Identity: identity-xxx for <cookie-uid>
+    Created user in Supabase: <user-id>
+    New user created: <user-id>
+    ```
+
+    This confirms the middleware created a user in both Supabase and Letta.
+
+    Verify in Supabase by going to your project dashboard, selecting **Table Editor**, and opening the `users` table. You should see one row with your cookie UID and Letta Identity ID.
+
+    ![Users table in Supabase](/images/letta-supabase/supabase-users-table.png)
+  </Step>
+
+  <Step title="Test agent creation">
+    In the chatbot interface, create a new agent by clicking **New Agent** or the agent creation button. After the agent is created, check your terminal logs:
+
+    ```
+    Created Letta Identity: identity-xxx for <cookie-uid>
+    Agent created: Letta ID agent-xxx, Supabase metadata stored
+    ```
+
+    Check the `agents` table in Supabase. You should see a row with:
+    - The Letta agent ID in `letta_agent_id`
+    - Your Supabase user ID in `user_id`
+    - The agent's name and configuration
+
+    ![Agents table in Supabase](/images/letta-supabase/supabase-agents-table.png)
+  </Step>
+
+  <Step title="Test message streaming and persistence">
+    Send a message to your agent. You should see the response stream in real-time, token by token. This is the Vercel AI SDK providing smooth UX.
+
+    After the response completes, check your terminal:
+
+    ```
+    Persisted conversation to Supabase for agent agent-xxx
+    ```
+
+    Open the `messages` table in Supabase. You should see two new rows:
+    - One with `role: 'user'` containing your message
+    - One with `role: 'assistant'` containing the agent's response
+
+    ![Messages table in Supabase](/images/letta-supabase/supabase-messages-table.png)
+
+    Both messages link to the same agent via the `agent_id` foreign key.
+  </Step>
+
+  <Step title="Test agent deletion">
+    Delete an agent from the interface. Check the Supabase tables:
+    - The agent row should be gone from the `agents` table
+    - All associated messages should be gone from the `messages` table (thanks to `ON DELETE CASCADE`)
+
+    Your terminal should show:
+
+    ```
+    Agent deleted: Letta ID agent-xxx and Supabase metadata
+    ```
+  </Step>
+
+  <Step title="Test multi-user isolation">
+    To verify users only see their own agents, open a different browser (or an incognito window). This creates a new cookie session:
+
+    1. Visit the app in the new browser
+    2. Create an agent
+    3. Switch back to your original browser
+    4. You should NOT see the agent from the other browser
+
+    Each browser has its own cookie, Supabase user, and Letta Identity. Agents are properly isolated by user.
+  </Step>
+</Steps>
+
+## Next steps
+
+You now have a production-ready multi-user chatbot with persistent storage. Here are some ways to extend it:
+
+<AccordionGroup>
+<Accordion title="Add archival memory for long-term storage">
+Connect a vector database to store conversation history beyond what fits in the agent's context window. Letta's archival memory lets agents search through past conversations semantically:
+
+```typescript
+// Load conversation history into archival memory
+await client.sources.create({
+  name: `agent-${agentId}-history`,
+  description: 'Past conversations with this agent'
+})
+
+// Attach to agent
+await client.agents.attachSource(agentId, sourceId)
+```
+
+Your Supabase `messages` table provides the raw data, and Letta's archival memory makes it semantically searchable by the agent.
+</Accordion>
+
+<Accordion title="Create custom tools for database queries">
+Build Letta tools that let agents query Supabase directly. For example, a tool that retrieves user conversation statistics:
+
+```typescript
+const getUserStatsTool = {
+  name: 'get_user_stats',
+  description: 'Get conversation statistics for the current user',
+  parameters: {},
+  func: async () => {
+    const { data } = await supabase
+      .from('messages')
+      .select('created_at')
+      .eq('user_id', currentUserId)
+
+    return {
+      totalMessages: data.length,
+      firstMessage: data[0]?.created_at
+    }
+  }
+}
+```
+
+This lets agents access database information without hardcoding queries in prompts.
+</Accordion>
+
+<Accordion title="Share memory blocks across agents">
+Use Letta's shared memory blocks to give multiple agents access to common information. Store references to shared blocks in Supabase:
+
+```sql
+CREATE TABLE shared_memory_blocks (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  letta_block_id TEXT NOT NULL,
+  organization_id UUID NOT NULL,
+  label TEXT NOT NULL,
+  value TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+```
+
+When creating agents, attach the organization's shared blocks for consistent knowledge across all agents.
+</Accordion>
+
+<Accordion title="Add user authentication">
+Replace cookie-based sessions with Supabase Auth:
+
+```typescript
+// In middleware, use Supabase session instead of cookies
+const { data: { session } } = await supabase.auth.getSession()
+if (session) {
+  const userData = await getOrCreateUser(session.user.email)
+  // Link to Letta Identity
+}
+```
+
+This gives you email/password login, social auth, and proper user management while maintaining the Letta Identity integration.
+</Accordion>
+</AccordionGroup>
+
+<CardGroup cols={2}>
+  <Card
+    title="Archival Memory"
+    icon="fa-sharp fa-light fa-box-archive"
+    href="/guides/agents/archival_memory_overview"
+    iconPosition="left"
+  >
+    Add unlimited semantic storage for conversation logs and reference material beyond the context window.
+  </Card>
+  <Card
+    title="Custom Tools"
+    icon="fa-sharp fa-light fa-wrench"
+    href="/guides/agents/custom_tools"
+    iconPosition="left"
+  >
+    Create tools that let agents query your Supabase database directly for advanced analytics and data retrieval.
+  </Card>
+  <Card
+    title="Memory Blocks"
+    icon="fa-sharp fa-light fa-brain"
+    href="/guides/agents/memory_blocks"
+    iconPosition="left"
+  >
+    Share memory blocks across multiple agents for common knowledge and organizational policies.
+  </Card>
+  <Card
+    title="Multi-User (Identities)"
+    icon="fa-sharp fa-light fa-users"
+    href="/guides/agents/multiuser"
+    iconPosition="left"
+  >
+    Learn more about Letta Identities and advanced multi-user patterns for building tenant-isolated applications.
+  </Card>
+</CardGroup>
