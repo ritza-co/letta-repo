@@ -1231,21 +1231,29 @@ Open [http://localhost:3000](http://localhost:3000) in your browser. You should 
 You now have a production-ready multi-user chatbot with persistent storage. Here are some ways to extend it:
 
 <AccordionGroup>
-<Accordion title="Add archival memory for long-term storage">
-Connect a vector database to store conversation history beyond what fits in the agent's context window. Letta's archival memory lets agents search through past conversations semantically:
+<Accordion title="Search conversation history beyond the context window">
+Access conversation history beyond what fits in the agent's context window. Letta provides tools for this:
 
+**Conversation Search** - Attached by default, searches through actual past messages. Agents can use `conversation_search("What did the user say about their preferences?")` to retrieve literal conversation history.
+
+**Archival Memory** - For curated facts and knowledge the agent stores intentionally:
 ```typescript
-// Load conversation history into archival memory
-await client.sources.create({
-  name: `agent-${agentId}-history`,
-  description: 'Past conversations with this agent'
-})
+// Ensure agent has archival memory tools attached
+await client.agents.tools.attach(agentId, archivalMemoryInsertToolId)
+await client.agents.tools.attach(agentId, archivalMemorySearchToolId)
 
-// Attach to agent
-await client.agents.attachSource(agentId, sourceId)
+// Agents decide what's worth remembering long-term:
+// archival_memory_insert("User prefers Python for data science projects")
+// archival_memory_search("What are the user's technology preferences?")
+
+// Batch-insert conversation summaries from your Supabase messages:
+const messages = await getMessagesByAgentId(supabaseAgent.id)
+for (const msg of messages) {
+  await client.archival.insert(agentId, `${msg.role}: ${msg.content}`)
+}
 ```
 
-Your Supabase `messages` table provides the raw data, and Letta's archival memory makes it semantically searchable by the agent.
+Use `conversation_search` for retrieving what was actually said. Use archival memory for storing distilled facts and knowledge. Learn more in the [archival memory docs](/guides/agents/archival-memory) and [prebuilt tools docs](/guides/agents/prebuilt-tools).
 </Accordion>
 
 <Accordion title="Create custom tools for database queries">
@@ -1274,20 +1282,26 @@ This lets agents access database information without hardcoding queries in promp
 </Accordion>
 
 <Accordion title="Share memory blocks across agents">
-Use Letta's shared memory blocks to give multiple agents access to common information. Store references to shared blocks in Supabase:
+Use Letta's shared memory blocks to give multiple agents access to common information. Letta tracks shared blocks internally, so you just need to create a block once and attach it to multiple agents:
 
-```sql
-CREATE TABLE shared_memory_blocks (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  letta_block_id TEXT NOT NULL,
-  organization_id UUID NOT NULL,
-  label TEXT NOT NULL,
-  value TEXT NOT NULL,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
+```typescript
+// Step 1: Create a shared memory block once
+const sharedBlock = await client.blocks.create({
+  label: "company_policies",
+  value: "Our company values X, Y, Z..."
+})
+
+// Step 2: Attach to multiple agents
+await client.agents.create({
+  ...agentConfig,
+  memoryBlocks: [
+    sharedBlock.id,  // Shared across all agents
+    personalBlock.id  // Unique to this agent
+  ]
+})
 ```
 
-When creating agents, attach the organization's shared blocks for consistent knowledge across all agents.
+This gives consistent knowledge across all agents in your organization.
 </Accordion>
 
 <Accordion title="Add user authentication">
@@ -1308,17 +1322,17 @@ This gives you email/password login, social auth, and proper user management whi
 
 <CardGroup cols={2}>
   <Card
-    title="Archival Memory"
+    title="Memory Tools"
     icon="fa-sharp fa-light fa-box-archive"
-    href="/guides/agents/archival_memory_overview"
+    href="/guides/agents/archival-memory"
     iconPosition="left"
   >
-    Add unlimited semantic storage for conversation logs and reference material beyond the context window.
+    Add tools for searching conversation history and storing knowledge beyond the context window.
   </Card>
   <Card
     title="Custom Tools"
     icon="fa-sharp fa-light fa-wrench"
-    href="/guides/agents/custom_tools"
+    href="/guides/agents/custom-tools"
     iconPosition="left"
   >
     Create tools that let agents query your Supabase database directly for advanced analytics and data retrieval.
@@ -1326,7 +1340,7 @@ This gives you email/password login, social auth, and proper user management whi
   <Card
     title="Memory Blocks"
     icon="fa-sharp fa-light fa-brain"
-    href="/guides/agents/memory_blocks"
+    href="/guides/agents/memory-blocks"
     iconPosition="left"
   >
     Share memory blocks across multiple agents for common knowledge and organizational policies.
@@ -1334,7 +1348,7 @@ This gives you email/password login, social auth, and proper user management whi
   <Card
     title="Multi-User (Identities)"
     icon="fa-sharp fa-light fa-users"
-    href="/guides/agents/multiuser"
+    href="/guides/agents/multi-user"
     iconPosition="left"
   >
     Learn more about Letta Identities and advanced multi-user patterns for building tenant-isolated applications.
