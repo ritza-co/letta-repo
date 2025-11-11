@@ -1,27 +1,46 @@
-# Connect Letta to Amazon Aurora PostgreSQL
+# How Letta Builds Production-Ready AI Agents with Amazon Aurora PostgreSQL
 
-Letta is an open-source framework for building stateful AI agents with long-term memory. By default, Letta stores agent state and memory in a local SQLite database. For production deployments that require scalability, durability, and high availability, you can configure Letta to use Amazon Aurora PostgreSQL-Compatible Edition as a managed database backend.
+AI agents require persistent memory to maintain context, learn from past interactions, and provide consistent responses over time. Without long-term memory, agents start each interaction from scratch, limiting their ability to build relationships with users or leverage historical context. This is particularly crucial in production environments where agents handle multiple concurrent users and need to maintain reliable state across sessions and system restarts.
 
-In this post, you'll learn how to set up Aurora Serverless v2 as a PostgreSQL backend for Letta. You'll create an Aurora cluster, configure Letta to connect using the `LETTA_PG_URI` environment variable, create agents that persist their memory to Aurora, and query the database to view agent state directly.
+Consider a customer service AI agent deployed at a large e-commerce company. Without long-term memory, the agent would need to ask customers to repeat their order numbers, shipping preferences, and past issues in every conversation. This creates a frustrating experience where loyal customers feel unrecognized and need to constantly provide context. With long-term memory, the agent can recall previous interactions, understand customer preferences, and maintain context across multiple support sessions – even when conversations span several days or weeks. This kind of persistent memory transforms customer service from transactional exchanges into meaningful, context-aware interactions.
+
+[Letta](https://www.letta.com/), an open-source framework for building stateful AI agents, offers a powerful solution for creating agents with long-term memory. While Letta's default SQLite database, which stores session memories, works well for development, production deployments demand a more robust database solution. This is where [Amazon Aurora PostgreSQL-Compatible Edition](https://aws.amazon.com/rds/aurora/) shines.
+
+In this post, we'll guide you through setting up [Aurora Serverless v2](https://aws.amazon.com/rds/aurora/serverless/) as a scalable, highly available PostgreSQL database repository for storing Letta long-term memory. You'll learn how to create an Aurora cluster in the cloud, configure Letta to connect to it, and deploy agents that persist their memory to Aurora. We'll also explore how to query the database directly to view agent state.
 
 ## Prerequisites
 
-To follow along with this guide, you need:
+Before we begin, ensure you have:
 
-- An [AWS account](https://aws.amazon.com/free/) with permissions to create Aurora clusters and modify security groups
-- Basic familiarity with PostgreSQL and the [psql command-line utility](https://www.postgresql.org/docs/current/app-psql.html)
-- [Docker](https://www.docker.com/get-started/) installed on your local machine
-- An [OpenAI API key](https://platform.openai.com/api-keys) for Letta's language model integration
-- [PostgreSQL client tools](https://www.postgresql.org/download/) installed locally (psql version 12 or higher recommended)
-- Python 3.8+ with pip, or Node.js 16+ with npm
+1. An [AWS account](https://aws.amazon.com/free/) with permissions to create Aurora clusters and modify [security groups](https://docs.aws.amazon.com/vpc/latest/userguide/VPC_SecurityGroups.html)
+2. [Docker](https://www.docker.com/get-started/) installed on your local machine
+3. An [OpenAI API key](https://www.docker.com/get-started/) for Letta's language model integration
+4. [PostgreSQL client tools](https://www.postgresql.org/download/) installed locally (psql version 12 or higher recommended)
+5. Python 3.8+ with pip, or Node.js 16+ with npm
 
 ## Solution overview
 
 Letta runs in a Docker container on your local machine and connects to Aurora PostgreSQL over the internet. Aurora stores all agent configuration, memory, and conversation history in PostgreSQL tables. The connection uses standard PostgreSQL wire protocol on port 5432.
 
+### Amazon Aurora
+
+The integration of Aurora PostgreSQL brings several powerful capabilities essential for production-ready AI agent memory systems. At its core, Aurora PostgreSQL provides native support for the pgvector extension, enabling efficient similarity searches across millions of vector embeddings, which are the numerical representation of past conversations. This capability is crucial for AI agents that need to quickly retrieve contextually relevant information. The system can handle vectors up to 16,384 dimensions, accommodating advanced AI models and their complex embedding requirements.
+
+Performance is a key strength of this architecture. Aurora PostgreSQL delivers sub-10ms query latency for memory lookups and supports up to 15 read replicas to scale memory retrieval operations efficiently. This means your AI agents can access their memory rapidly, even under heavy loads. The system's storage capacity extends up to 128TB, providing ample space for extensive memory archives and long-term conversation history.
+
+Reliability is ensured through Aurora's comprehensive durability features. The system maintains 6-way replication across three Availability Zones, dramatically reducing the risk of data loss. Your agents' memories are further protected by point-in-time recovery capabilities with up to 35 days of backup retention. The self-healing storage system continuously performs data integrity checks, ensuring the consistency of your agents' memory states.
+
+Scalability is built into the foundation of Aurora Serverless v2. The system automatically scales based on workload, handling thousands of concurrent agent connections effortlessly. Storage scaling is equally dynamic, growing from 10GB to 128TB without any downtime, ensuring your agents never run out of memory space as they learn and interact.
+
+### Letta
+
+[Letta treats agents as persistent services](https://docs.letta.com/getting-started/core-concepts), maintaining state server-side and enabling agents to run independently, communicate with each other, and continue processing when clients are offline. For production workloads, [Letta supports horizontal scaling via Kubernetes](https://docs.letta.com/guides/selfhosting/performance), with configurable worker processes and database connection pooling. The [background execution mode](https://docs.letta.com/guides/agents/long-running) enables resumable streams that survive disconnects and allow load balancing by picking up streams started by other instances.
+
+Production deployments support multi-tenancy with unlimited agents on [Pro and Enterprise plans](https://docs.letta.com/guides/cloud/plans), making Letta suitable for large-scale customer service and multi-user applications. The platform includes [enterprise features](https://docs.letta.com/guides/cloud/rbac) like SAML/OIDC SSO, role-based access control, and tool sandboxing, with [telemetry and performance monitoring](https://docs.letta.com/guides/server/otel) for tracking system metrics. While this guide demonstrates a local setup, production deployments typically use [cloud platforms](https://docs.letta.com/guides/server/remote) with HTTPS access and [security controls](https://docs.letta.com/guides/selfhosting).
+
 Here's what you'll build:
 
-1. An Aurora Serverless v2 cluster with the pgvector extension for embedding storage
+1. An Aurora Serverless v2 cluster with the [pgvector](https://github.com/pgvector/pgvector) extension for embedding storage
 2. A security group configuration that allows your IP address to connect on port 5432
 3. A Letta Docker container configured with `LETTA_PG_URI` pointing to Aurora
 4. Working AI agents that persist all state to Aurora instead
@@ -54,7 +73,7 @@ To create the Aurora cluster:
    - **Minimum capacity (ACUs)**: 0.5
    - **Maximum capacity (ACUs)**: 1
 
-   These minimal capacity settings are appropriate for development and testing workloads. For production deployments, adjust the ACU range based on your expected workload requirements.
+   ACUs (Aurora Capacity Units) are the measurement unit for database compute capacity in Aurora Serverless v2. Each ACU is a combination of approximately 2 GB of memory, corresponding CPU and networking capabilities. For example, 0.5 ACUs provides 1 GB of memory, while 32 ACUs provides 64 GB of memory with proportional compute resources. Your Aurora [database charges](https://aws.amazon.com/rds/aurora/pricing/) are based on the ACU usage per second. For development and testing, starting with 0.5-1 ACU is sufficient. Production workloads typically require higher ACU ranges based on your application's memory and processing needs. The beauty of Aurora Serverless v2 is that it automatically adjusts capacity within your specified ACU range based on actual database load. Aurora can even can scale to a minimum capacity of zero ACUs, which eliminates all compute charges in time periods where your cluster is not being used.
 
 10. Under **Connectivity**, configure:
     - **Public access**: Choose **Yes**
@@ -102,10 +121,7 @@ After the cluster status shows **Available**, retrieve the connection endpoint:
 
 2. In the **Connectivity & security** tab, find the **Endpoints** section.
 3. Copy the **Writer instance endpoint**. It looks similar to:
-
-   ```
-   letta-aurora-cluster.cluster-abc123def456.us-east-1.rds.amazonaws.com
-   ```
+   - letta-aurora-cluster.cluster-abc123def456.us-east-1.rds.amazonaws.com
 
    ![Copying the writer endpoint from RDS console](../../images/aws-aurora-integration/rds-copy-endpoint.png)
 
@@ -126,7 +142,6 @@ To install pgvector:
    ```
 
 2. When prompted, enter the master password you configured during cluster creation.
-
 3. After successful connection, you'll see the PostgreSQL prompt:
 
    ```
@@ -196,20 +211,20 @@ Replace `YOUR_PASSWORD` with your Aurora master password, `YOUR_CLUSTER_ENDPOINT
 
 Watch for the migration output. You should see:
 
-   ```
-   INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
-   INFO  [alembic.runtime.migration] Will assume transactional DDL.
-   INFO  [alembic.runtime.migration] Running upgrade  -> 9a505cc7eca9, Create a baseline migrations
-   ```
+```
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+INFO  [alembic.runtime.migration] Running upgrade  -> 9a505cc7eca9, Create a baseline migrations
+```
 
-   This confirms Letta detected the PostgreSQL connection and created the necessary database schema.
+This confirms Letta detected the PostgreSQL connection and created the necessary database schema.
 
-4. When you see the following output, the server is ready:
+When you see the following output, the server is ready:
 
-   ```
-   INFO:     Application startup complete.
-   INFO:     Uvicorn running on http://0.0.0.0:8283
-   ```
+```
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8283
+```
 
 Letta is now running and connected to Aurora. All agent data will persist to your Aurora cluster instead of local storage.
 
@@ -513,7 +528,7 @@ For a newly created agent with basic conversation history, both tables will show
 - Use archival memory features for long-term storage
 - Implement retrieval-augmented generation workflows
 
-The `source_passages` table stores embeddings for external data sources, while `archival_passages` stores embeddings for the agent's archival memory system. Both leverage pgvector's vector data type for efficient similarity search.
+The `source_passages` table stores embeddings for external data sources, while `archival_passages` stores embeddings for the agent's archival memory system. Both utilize pgvector's vector data type for efficient similarity search.
 
 ## Clean up
 
@@ -549,5 +564,4 @@ In this post, you configured Letta to use Amazon Aurora PostgreSQL-Compatible Ed
 
 This integration enables production deployments of Letta with the scalability, durability, and high availability that Aurora provides. For production use, consider implementing additional security measures such as IAM database authentication, encryption at rest, and restricting security group access to specific IP ranges or VPC configurations.
 
-To learn more about Letta, visit the [Letta documentation](https://docs.letta.ai/). For more information about Aurora PostgreSQL, see the [Amazon Aurora User Guide](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/Aurora.AuroraPostgreSQL.html).
-
+To learn more about Letta, visit the [Letta documentation](https://docs.letta.com/). For more information about Aurora PostgreSQL, see the [Amazon Aurora User Guide](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/Aurora.AuroraPostgreSQL.html).
