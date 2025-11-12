@@ -614,6 +614,10 @@ navigation:
           - page: Building customer-specific relationship agents
             path: pages/tutorials/customer-specific-agents.mdx
 
+      - section: Workflows
+        contents:
+          - page: Connecting Zapier and Letta
+            path: pages/cookbooks/zapier.mdx
   - tab: leaderboard
     layout:
       - link: Chat on Discord
