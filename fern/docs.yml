@@ -616,8 +616,8 @@ navigation:
 
       - section: Workflows
         contents:
-          - page: Connecting Zapier and Letta
-            path: pages/cookbooks/zapier.mdx
+          - page: Connecting n8n and Letta
+            path: pages/cookbooks/n8n.mdx
   - tab: leaderboard
     layout:
       - link: Chat on Discord
