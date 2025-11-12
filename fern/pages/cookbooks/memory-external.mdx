@@ -568,7 +568,7 @@ def main():
         print("Creating AgentMemory collection...")
         client.collections.create(
             name="AgentMemory",
-            vectorizer_config=Configure.Vectorizer.text2vec_openai(
+            vector_config=Configure.Vectors.text2vec_openai(
                 model="text-embedding-3-small"
             ),
             properties=[
