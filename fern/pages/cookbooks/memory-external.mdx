@@ -33,10 +33,11 @@ We'll need API keys for Letta and your chosen memory provider.
   </Step>
   <Step title="Navigate to API Keys">
     Once logged in, click on **API keys** in the sidebar.
-    ![Letta API Key Navigation](/images/memory-external/letta-api-key-nav.png)
   </Step>
   <Step title="Create and Copy Your Key">
     Click **+ Create API key**, give it a descriptive name, and click **Confirm**. Copy the key and save it somewhere safe.
+
+    ![Letta API Key Navigation](/images/memory-external/letta-api-key-nav.png)
   </Step>
 </Steps>
 </Accordion>
@@ -49,14 +50,16 @@ We'll need API keys for Letta and your chosen memory provider.
     Sign up for a free account at [mongodb.com/cloud/atlas/register](https://www.mongodb.com/cloud/atlas/register).
   </Step>
   <Step title="Create a Free Cluster">
-    Click **Build a Cluster** and select the free tier (M0). Choose your preferred cloud provider and region and click **Create deployment**.
+    Click **Build a Cluster** and select the free tier. Choose your preferred cloud provider and region and click **Create Deployment**.
     ![Create MongoDB Cluster](/images/memory-external/create-cluster-mongodb.png)
   </Step>
   <Step title="Set Up Database Access">
     Next, set up connection security.
-    1. Create a database user, then click **Choose a connection method**
-    2. Choose **Drivers** to connect to your application, choose Python as the driver.
-    3. Copy the **entire** connection string, including the query parameters at the end. It will look like this:
+
+    1. On the security quickstart create a database user, then click **Finish and Close**.
+    2. On the cluster creation card click **Connect**.
+    3. Choose **Drivers** to connect to your application, choose Python as the driver.
+    4. Copy the **entire** connection string, including the query parameters at the end. It will look like this:
 
     ```
     mongodb+srv://<username>:<password>@cluster0.xxxxx.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0
@@ -72,7 +75,7 @@ We'll need API keys for Letta and your chosen memory provider.
     By default, MongoDB Atlas blocks all outside connections. You must grant access to the services that need to connect.
 
     1. Navigate to **Database and Network Access** in the left sidebar.
-    2. Click **Add IP Address**.
+    2. On the **IP Access List** tab click **+ ADD IP ADDRESS**.
     3. For local development and testing, select **Allow Access From Anywhere**. This will add the IP address `0.0.0.0/0`.
     4. Click **Confirm**.
 
@@ -129,13 +132,13 @@ Graphiti also requires an **OpenAI API key** for LLM operations and embeddings. 
     Sign up for a free account at [console.weaviate.cloud](https://console.weaviate.cloud/).
   </Step>
   <Step title="Create a Free Cluster">
-    Click **Create cluster**, select the free **Sandbox** tier, give your cluster a name, and click **Create**.
+    Click **+ Create cluster**, select the free **Sandbox** tier, give your cluster a name, and click **Create**.
     ![Create Weaviate Cluster](/images/memory-external/weaviate-create-cluster.png)
   </Step>
   <Step title="Get Your Cluster URL and API Key">
     Once your cluster is ready, click on it to view details. You'll find:
 
-    - **Cluster URL (REST Endpoint)**: `https://xxxxx.weaviate.network`
+    - **Cluster URL (REST Endpoint)**: `https://xxxxx.weaviate.cloud`
     - **API Key**: Click **API keys**, then click **+ New key** to create a key. Copy and save the generated key.
 
     ![Weaviate Connection Details](/images/memory-external/weaviate-connection-details.png)
@@ -204,7 +207,7 @@ NEO4J_PASSWORD="..."
   <Tab title="Weaviate Cloud" language="weaviate">
 ```bash
 LETTA_API_KEY="..."
-WEAVIATE_URL="https://xxxxx.weaviate.network"
+WEAVIATE_URL="https://xxxxx.weaviate.cloud"
 WEAVIATE_API_KEY="..."
 OPENAI_API_KEY="..."
 ```
@@ -313,6 +316,26 @@ pip install -r requirements.txt
 ```bash
 # Initialize a new Node.js project if you haven't already
 npm init -y
+
+# Create tsconfig.json for TypeScript configuration
+cat > tsconfig.json << 'EOF'
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "ESNext",
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "strict": true
+  }
+}
+EOF
+```
+
+Update package.json to use ES modules:
+
+```json
+"type": "module"
 ```
 
 Install the necessary packages for your chosen provider:
@@ -356,11 +379,13 @@ npm install --save-dev typescript @types/node tsx
   </Tab>
 </Tabs>
 
-Now initialize your database (if required). Some providers need infrastructure setup, while others are fully managed:
+Now initialize your database (if required). Some providers need infrastructure setup, while others are fully managed.
 
 <Note>
 **Mem0 and Zep users:** Both Mem0 and Zep are fully managed services, so no database setup is required. You can skip the setup step below and proceed directly to Step 2.
 </Note>
+
+Create a `setup.py` or `setup.ts` file to add the code:
 
 <Tabs>
   <Tab title="MongoDB Atlas" language="mongo">
@@ -646,18 +671,18 @@ main().catch(console.error);
 
 Run the setup script:
 
-<Tabs>
-  <Tab title="Python">
-```bash
-python setup.py
-```
-  </Tab>
-  <Tab title="TypeScript">
-```bash
-npx tsx setup.ts
-```
-  </Tab>
-</Tabs>
+  <Tabs>
+    <Tab title="Python">
+  ```bash
+  python setup.py
+  ```
+    </Tab>
+    <Tab title="TypeScript">
+  ```bash
+  npx tsx setup.ts
+  ```
+    </Tab>
+  </Tabs>
   </Tab>
   <Tab title="Mem0 Platform" language="mem0">
 No setup required! Mem0 is a fully managed service. Your memories will be automatically stored and organized when you use the memory tools in Step 2.
@@ -680,7 +705,7 @@ A Letta tool is a Python function that your agent can call. We'll create two too
 
 Letta automatically generates JSON schemas from your function signatures and docstrings, making these tools available to your agent. The agent can then decide when to call these functions based on the conversation.
 
-Create a new file named `tools.py` with the implementation for your chosen provider:
+Create a new file named `tools.py` or `tools.ts` with the implementation for your chosen provider:
 
 <Tabs>
   <Tab title="MongoDB Atlas" language="mongo">
@@ -1848,13 +1873,13 @@ Zep organizes memories in session-based threads with automatic summarization and
 
 Now we'll create an agent and attach our custom memory tools to it. The process involves:
 
-1. **Register the tools** - Upload your memory functions to Letta's tool registry
-2. **Define the agent's persona** - Provide instructions on when to store and retrieve memories
-3. **Create the agent** - Link the tools and configure environment variables for database access
+1. **Registering tools** - Upload your memory functions to Letta's tool registry
+2. **Defining the agent's persona** - Provide instructions on when to store and retrieve memories
+3. **Creating the agent** - Link the tools and configure environment variables for database access
 
 The agent's persona guides its behavior, instructing it to proactively store important information and retrieve relevant context when needed.
 
-Create a file named `create_agent.py`:
+Create a file named `create_agent.py` or `create_agent.ts`:
 
 <Tabs>
   <Tab title="MongoDB Atlas" language="mongo">
@@ -2514,15 +2539,25 @@ We set `include_base_tools=False` to prevent the agent from using Letta's defaul
 
 Run this script once to create the agent:
 
-```bash
-python create_agent.py
-```
+<Tabs>
+  <Tab title="Python">
+    ```bash
+    python create_agent.py
+    ```
+  </Tab>
+  <Tab title="TypeScript">
+    ```bash
+    npx tsx create_agent.ts
+    ```
+  </Tab>
+</Tabs>
+
 
 Your agent is now fully configured with custom memory tools and environment variables.
 
 ## Step 4: Test Your Memory Agent
 
-Now we'll interact with the agent to test memory storage and retrieval. Create a file named `chat.py`:
+Now we'll interact with the agent to test memory storage and retrieval. Create a file named `chat.py` or `chat.ts`:
 
 <Tabs>
   <Tab title="MongoDB Atlas" language="mongo">
@@ -3129,9 +3164,19 @@ main().catch(console.error);
 
 Run the chat script with your agent ID:
 
-```bash
-python chat.py
-```
+<Tabs>
+  <Tab title="Python">
+    ```bash
+    python chat.py
+    ```
+  </Tab>
+  <Tab title="TypeScript">
+    ```bash
+    npx tsx chat.ts
+    ```
+  </Tab>
+</Tabs>
+
 
 Try these example conversations to test memory functionality:
 
@@ -3161,7 +3206,7 @@ You can inspect your agent's behavior and see the memory tool calls in the Letta
     Log in to [letta.com](https://www.letta.com) and click on **Agents** in the sidebar to view your agents.
   </Step>
   <Step title="Open Your Agent">
-    Click on your memory assistant agent to open it in the playground.
+    Click **Open in ADE** on your agent to open it in the playground.
     ![Letta Agents List](/images/memory-external/letta-agents-list.png)
   </Step>
   <Step title="View Tool Calls">
