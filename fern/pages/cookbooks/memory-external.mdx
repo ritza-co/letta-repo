@@ -1,5 +1,5 @@
 ---
-title: Integrating External Memory Storage with Letta
+title: Integrating external memory storage with Letta
 subtitle: Store agent memories in external databases for custom memory management
 slug: guides/memory/external-storage
 ---
@@ -10,31 +10,31 @@ In this guide, we'll build a conversational assistant that stores its memories i
 
 ## Prerequisites
 
-To follow along, you need free accounts for:
+To follow this tutorial, you need:
 
-- **[Letta](https://www.letta.com)** to access the agent development platform
-- Python 3.8+ or Node.js v18+ and a code editor
-- **One of the following memory providers:**
+- **A free [Letta](https://www.letta.com) account** for accessing the agent development platform
+- **Python** (version 3.8 or later) or **Node.js** (version 18 or later) and a code editor
+- **A free account for one of the following memory providers:**
   - **[MongoDB Atlas](https://www.mongodb.com/cloud/atlas/register)** for document-based memory storage
   - **[Neo4j Aura](https://neo4j.com/cloud/platform/aura-graph-database/)** for Graphiti's knowledge graph backend (also requires an **[OpenAI API key](https://platform.openai.com/api-keys)** for LLM operations)
   - **[Weaviate Cloud](https://console.weaviate.cloud/)** for vector-based semantic search (also requires an **[OpenAI API key](https://platform.openai.com/api-keys)** for text vectorization)
   - **[Mem0 Platform](https://app.mem0.ai/)** for managed intelligent memory
   - **[Zep Cloud](https://www.getzep.com/)** for session-based memory with knowledge graphs
 
-## Getting Your API Keys
+## Getting your API keys
 
-We'll need API keys for Letta and your chosen memory provider.
+You also need API keys for Letta and your chosen memory provider.
 
 <AccordionGroup>
-<Accordion title="Get your Letta API Key">
+<Accordion title="Get your Letta API key">
 <Steps>
   <Step title="Create a Letta Account">
     If you don't have one, sign up for a free account at [letta.com](https://www.letta.com).
   </Step>
-  <Step title="Navigate to API Keys">
+  <Step title="Navigate to API keys">
     Once logged in, click on **API keys** in the sidebar.
   </Step>
-  <Step title="Create and Copy Your Key">
+  <Step title="Create and copy your key">
     Click **+ Create API key**, give it a descriptive name, and click **Confirm**. Copy the key and save it somewhere safe.
 
     ![Letta API Key Navigation](/images/memory-external/letta-api-key-nav.png)
@@ -42,23 +42,23 @@ We'll need API keys for Letta and your chosen memory provider.
 </Steps>
 </Accordion>
 
-<Accordion title="Get your Memory Provider credentials">
+<Accordion title="Get your memory provider credentials">
 <Tabs>
   <Tab title="MongoDB Atlas" language="mongo">
 <Steps>
-  <Step title="Create a MongoDB Atlas Account">
+  <Step title="Create a MongoDB Atlas account">
     Sign up for a free account at [mongodb.com/cloud/atlas/register](https://www.mongodb.com/cloud/atlas/register).
   </Step>
-  <Step title="Create a Free Cluster">
-    Click **Build a Cluster** and select the free tier. Choose your preferred cloud provider and region and click **Create Deployment**.
+  <Step title="Create a free cluster">
+    Click **Build a Cluster** and select the **Free** tier. Choose your preferred cloud provider and region and click **Create Deployment**.
     ![Create MongoDB Cluster](/images/memory-external/create-cluster-mongodb.png)
   </Step>
-  <Step title="Set Up Database Access">
+  <Step title="Set up database access">
     Next, set up connection security.
 
     1. On the security quickstart create a database user, then click **Finish and Close**.
     2. On the cluster creation card click **Connect**.
-    3. Choose **Drivers** to connect to your application, choose Python as the driver.
+    3. Choose **Drivers** to connect to your application, and select **Python** as the driver.
     4. Copy the **entire** connection string, including the query parameters at the end. It will look like this:
 
     ```
@@ -66,23 +66,23 @@ We'll need API keys for Letta and your chosen memory provider.
     ```
 
     <Note>
-    Make sure to replace `<password>` with your actual database user password. Keep all the query parameters (`?retryWrites=true&w=majority&appName=Cluster0`) they are required for proper connection configuration.
+    Make sure to replace `<password>` with your actual database user password. Keep all the query parameters (`?retryWrites=true&w=majority&appName=Cluster0`), as they are required for proper connection configuration.
     </Note>
 
     ![MongoDB Connection String](/images/memory-external/connection-string-mongodb.png)
   </Step>
-  <Step title="Configure Network Access (IP Whitelist)">
+  <Step title="Configure network access (IP whitelist)">
     By default, MongoDB Atlas blocks all outside connections. You must grant access to the services that need to connect.
 
     1. Navigate to **Database and Network Access** in the left sidebar.
-    2. On the **IP Access List** tab click **+ ADD IP ADDRESS**.
-    3. For local development and testing, select **Allow Access From Anywhere**. This will add the IP address `0.0.0.0/0`.
+    2. On the **IP Access List** tab, click **+ ADD IP ADDRESS**.
+    3. For local development and testing, select **Allow Access From Anywhere**. This adds the IP address `0.0.0.0/0`.
     4. Click **Confirm**.
 
     ![MongoDB IP Configuration](/images/memory-external/ip-config-mongodb.png)
 
     <Note>
-    For a production environment, you would replace `0.0.0.0/0` with a secure list of static IP addresses provided by your hosting service (e.g., Letta).
+    For a production environment, you would replace `0.0.0.0/0` with a secure list of static IP addresses provided by your hosting service (for example, Letta).
     </Note>
   </Step>
 </Steps>
@@ -90,26 +90,26 @@ We'll need API keys for Letta and your chosen memory provider.
 
   <Tab title="Neo4j Aura (for Graphiti)" language="neo4j">
 <Steps>
-  <Step title="Create a Neo4j Aura Account">
+  <Step title="Create a Neo4j Aura account">
     Sign up for a free account at [neo4j.com/cloud/aura](https://neo4j.com/cloud/aura/).
   </Step>
-  <Step title="Create a Free Instance">
+  <Step title="Create a free instance">
     Navigate to **Instances** in the sidebar, then click **Create instance**. Choose a name for your database and select your preferred cloud provider and region, then click **Create instance**.
     ![Create Neo4j Instance](/images/memory-external/neo4j-create-instance.png)
   </Step>
-  <Step title="Save Your Credentials">
-    After clicking **Create instance**, Neo4j will display your credentials. **Save these immediately** as you won't see the password again:
+  <Step title="Save your credentials">
+    After clicking **Create instance**, Neo4j will display your credentials. **Save these immediately** because you won't see the password again:
 
     - **Username**: `neo4j` (default)
     - **Password**: The generated password (save this!)
 
     ![Neo4j Credentials](/images/memory-external/neo4j-credentials.png)
   </Step>
-  <Step title="Wait for Instance to Be Ready">
-    Your instance will take 1-2 minutes to become active. Wait until the status shows **Running** before proceeding.
+  <Step title="Wait for the instance to activate">
+    Your instance will take one to two minutes to become active. Wait until the status shows **Running** before proceeding.
   </Step>
-  <Step title="Get Your Connection URI">
-    Once your instance is running, copy the **Instance ID** from the instances page. Construct your connection URI using this format:
+  <Step title="Get your connection URI">
+    Once your instance is running, copy the instance **ID** from the **Instances** page. Construct your connection URI using this format:
 
     ```
     neo4j+s://<instance-id>.databases.neo4j.io
@@ -128,15 +128,15 @@ Graphiti also requires an **OpenAI API key** for LLM operations and embeddings. 
 
   <Tab title="Weaviate Cloud" language="weaviate">
 <Steps>
-  <Step title="Create a Weaviate Cloud Account">
+  <Step title="Create a Weaviate Cloud account">
     Sign up for a free account at [console.weaviate.cloud](https://console.weaviate.cloud/).
   </Step>
-  <Step title="Create a Free Cluster">
+  <Step title="Create a free cluster">
     Click **+ Create cluster**, select the free **Sandbox** tier, give your cluster a name, and click **Create**.
     ![Create Weaviate Cluster](/images/memory-external/weaviate-create-cluster.png)
   </Step>
-  <Step title="Get Your Cluster URL and API Key">
-    Once your cluster is ready, click on it to view details. You'll find:
+  <Step title="Get your cluster URL and API key">
+    Once your cluster is ready, click on it to view its details. You'll find:
 
     - **Cluster URL (REST Endpoint)**: `https://xxxxx.weaviate.cloud`
     - **API Key**: Click **API keys**, then click **+ New key** to create a key. Copy and save the generated key.
@@ -152,10 +152,10 @@ Weaviate also requires an **OpenAI API key** for automatic text vectorization. Y
 
   <Tab title="Mem0 Platform" language="mem0">
 <Steps>
-  <Step title="Create a Mem0 Platform Account">
+  <Step title="Create a Mem0 Platform account">
     Sign up for a free account at [app.mem0.ai](https://app.mem0.ai/).
   </Step>
-  <Step title="Get Your API Key">
+  <Step title="Get your API key">
     Once logged in, navigate to **Settings** in the sidebar, then click the **API Keys** tab. Click **Create**, give it a name, and copy the key.
     ![Mem0 API Key](/images/memory-external/mem0-api-key.png)
   </Step>
@@ -168,10 +168,10 @@ Mem0 is a fully managed service. No infrastructure setup is required.
 
   <Tab title="Zep Cloud" language="zep">
 <Steps>
-  <Step title="Create a Zep Cloud Account">
+  <Step title="Create a Zep Cloud account">
     Sign up for a free account at [getzep.com](https://www.getzep.com/).
   </Step>
-  <Step title="Get Your API Key">
+  <Step title="Get your API key">
     Once logged in, navigate to the **Project Keys** section in your dashboard. Create a new API key and copy it (it will start with `z_`).
     ![Zep API Key](/images/memory-external/zep-api-key.png)
   </Step>
@@ -185,7 +185,7 @@ Zep is a fully managed service with knowledge graph technology. No infrastructur
 </Accordion>
 </AccordionGroup>
 
-Once you have these credentials, create a `.env` file in your project directory:
+Once you have these credentials, create a `.env` file in your project directory and save them as environment variables:
 
 <Tabs>
   <Tab title="MongoDB Atlas" language="mongo">
@@ -226,11 +226,11 @@ ZEP_API_KEY="z_..."
   </Tab>
 </Tabs>
 
-## Step 1: Set Up Your Memory Storage
+## Step 1: Set up your memory storage
 
 First, we need to prepare the external database to store agent memories. Each provider requires different setup steps.
 
-Before we begin, set up your development environment:
+Before you begin, set up your development environment:
 
 <Tabs>
   <Tab title="Python">
@@ -240,7 +240,7 @@ python -m venv venv
 source venv/bin/activate  # On Windows, use: venv\Scripts\activate
 ```
 
-Install the necessary packages for your chosen provider:
+Create a `requirements.txt` file that lists the necessary packages for your chosen provider:
 
 <Tabs>
   <Tab title="MongoDB Atlas" language="mongo">
@@ -253,7 +253,7 @@ dnspython
 python-dotenv
 ```
 
-Install with:
+Install the packages with the following command:
 ```bash
 pip install -r requirements.txt
 ```
@@ -266,7 +266,7 @@ graphiti-core[neo4j]
 python-dotenv
 ```
 
-Install with:
+Install the packages with the following command:
 ```bash
 pip install -r requirements.txt
 ```
@@ -279,7 +279,7 @@ weaviate-client>=4.0.0
 python-dotenv
 ```
 
-Install with:
+Install the packages with the following command:
 ```bash
 pip install -r requirements.txt
 ```
@@ -292,7 +292,7 @@ mem0ai
 python-dotenv
 ```
 
-Install with:
+Install the packages with the following command:
 ```bash
 pip install -r requirements.txt
 ```
@@ -305,7 +305,7 @@ zep-cloud>=3.0.0
 python-dotenv
 ```
 
-Install with:
+Install the packages with the following command:
 ```bash
 pip install -r requirements.txt
 ```
@@ -354,7 +354,7 @@ npm install --save-dev typescript @types/node tsx
 ```
 
 <Note>
-Graphiti does not have a TypeScript SDK. You'll use Python for database setup, then TypeScript for agent creation and chat.
+Graphiti does not have a TypeScript SDK. You'll use Python for database setup, then use TypeScript for agent creation and chat.
 </Note>
   </Tab>
   <Tab title="Weaviate Cloud" language="weaviate">
@@ -379,7 +379,7 @@ npm install --save-dev typescript @types/node tsx
   </Tab>
 </Tabs>
 
-Now initialize your database (if required). Some providers need infrastructure setup, while others are fully managed.
+If your provider requires you to set up the infrastructure, initialize your database with the following code:
 
 <Note>
 **Mem0 and Zep users:** Both Mem0 and Zep are fully managed services, so no database setup is required. You can skip the setup step below and proceed directly to Step 2.
@@ -685,23 +685,23 @@ Run the setup script:
   </Tabs>
   </Tab>
   <Tab title="Mem0 Platform" language="mem0">
-No setup required! Mem0 is a fully managed service. Your memories will be automatically stored and organized when you use the memory tools in Step 2.
+No setup required! Mem0 is a fully managed service and will automatically store and organize your memories when you use the memory tools in Step 2.
 
 Proceed directly to Step 2 to create your memory tools.
   </Tab>
   <Tab title="Zep Cloud" language="zep">
-No setup required! Zep is a fully managed service. Your memories will be automatically stored in sessions when you use the memory tools in Step 2.
+No setup required! Zep is a fully managed service and will automatically store and organize your memories when you use the memory tools in Step 2.
 
 Proceed directly to Step 2 to create your memory tools.
   </Tab>
 </Tabs>
 
-## Step 2: Create Custom Memory Tools
+## Step 2: Create custom memory tools
 
 A Letta tool is a Python function that your agent can call. We'll create two tools for each provider:
 
-1. **`insert_memory`** - Stores new memories with agent ID, user ID, and content
-2. **`search_memory`** - Retrieves relevant memories filtered by agent and user
+- **`insert_memory`:** Stores new memories with agent ID, user ID, and content
+- **`search_memory`:** Retrieves relevant memories filtered by agent and user
 
 Letta automatically generates JSON schemas from your function signatures and docstrings, making these tools available to your agent. The agent can then decide when to call these functions based on the conversation.
 
@@ -1444,7 +1444,7 @@ def search_weaviate_memory(query: str, memory_agent_id: str, limit: int = 5) -> 
 ```
 </CodeBlocks>
 
-Memories are automatically vectorized using OpenAI embeddings when stored. The `search_weaviate_memory` function performs vector similarity search to find semantically related memories, even if they don't share exact keywords.
+Memories are automatically vectorized using OpenAI embeddings when stored. The `search_weaviate_memory` function performs a vector similarity search to find semantically related memories, even if they don't share exact keywords.
   </Tab>
   <Tab title="Mem0 Platform" language="mem0">
 <CodeBlocks>
@@ -1683,7 +1683,7 @@ def search_mem0_memory(
 ```
 </CodeBlocks>
 
-Mem0 is a fully managed service that handles intelligent memory extraction and organization automatically. The `insert_memory` function sends content to Mem0's API, which extracts entities and facts. The `search_mem0_memory` function uses semantic search to retrieve relevant memories with metadata.
+Mem0 is a fully managed service that automatically handles intelligent memory extraction and organization. The `insert_memory` function sends content to Mem0's API, which extracts entities and facts. The `search_mem0_memory` function uses semantic search to retrieve relevant memories with metadata.
   </Tab>
   <Tab title="Zep Cloud" language="zep">
 <CodeBlocks>
@@ -1865,17 +1865,17 @@ def search_zep_memory(query: str, memory_agent_id: str, user_id: str = "user", l
 ```
 </CodeBlocks>
 
-Zep organizes memories in session-based threads with automatic summarization and knowledge graph technology. The `insert_memory` function stores memories in user-specific threads, while `search_zep_memory` retrieves context-aware information including facts, entities, and episodes from the conversation history.
+Zep organizes memories in session-based threads with automatic summarization and knowledge graph technology. The `insert_memory` function stores memories in user-specific threads, while `search_zep_memory` retrieves context-aware information, including facts, entities, and episodes from the conversation history.
   </Tab>
 </Tabs>
 
-## Step 3: Configure an Agent with Custom Memory
+## Step 3: Configure an agent with custom memory
 
-Now we'll create an agent and attach our custom memory tools to it. The process involves:
+Now we'll create an agent and attach our custom memory tools to it. You need to do the following:
 
-1. **Registering tools** - Upload your memory functions to Letta's tool registry
-2. **Defining the agent's persona** - Provide instructions on when to store and retrieve memories
-3. **Creating the agent** - Link the tools and configure environment variables for database access
+- **Register the tools:** Upload your memory functions to Letta's tool registry.
+- **Define the agent's persona:** Provide instructions on when to store and retrieve memories.
+- **Create the agent:** Link the tools and configure environment variables for database access.
 
 The agent's persona guides its behavior, instructing it to proactively store important information and retrieve relevant context when needed.
 
@@ -2553,11 +2553,13 @@ Run this script once to create the agent:
 </Tabs>
 
 
-Your agent is now fully configured with custom memory tools and environment variables.
+You have now fully configured your agent with custom memory tools and environment variables.
 
-## Step 4: Test Your Memory Agent
+## Step 4: Test your memory agent
 
-Now we'll interact with the agent to test memory storage and retrieval. Create a file named `chat.py` or `chat.ts`:
+Now we'll interact with the agent to test memory storage and retrieval.
+
+Create a file named `chat.py`:
 
 <Tabs>
   <Tab title="MongoDB Atlas" language="mongo">
@@ -3197,7 +3199,7 @@ Assistant: Let me search my memories... You're James, and you love Python progra
 
 The agent stores memories in your external database and retrieves them across sessions, demonstrating persistent memory storage.
 
-### Viewing Tool Calls in the ADE
+### Viewing tool calls in the ADE
 
 You can inspect your agent's behavior and see the memory tool calls in the Letta Agent Development Environment (ADE):
 
@@ -3205,11 +3207,12 @@ You can inspect your agent's behavior and see the memory tool calls in the Letta
   <Step title="Navigate to the ADE">
     Log in to [letta.com](https://www.letta.com) and click on **Agents** in the sidebar to view your agents.
   </Step>
-  <Step title="Open Your Agent">
-    Click **Open in ADE** on your agent to open it in the playground.
+  <Step title="Open your agent">
+     Click **Open in ADE** on your agent to open it in the playground.
+
     ![Letta Agents List](/images/memory-external/letta-agents-list.png)
   </Step>
-  <Step title="View Tool Calls">
+  <Step title="View tool calls">
     As you chat with your agent, expand the message details to see the tool calls being made. You'll see when the agent calls `insert_memory` to store information and when it calls your provider's search function to retrieve memories.
 
     ![Tool Calls in ADE](/images/memory-external/letta-tool-calls.png)
@@ -3218,13 +3221,13 @@ You can inspect your agent's behavior and see the memory tool calls in the Letta
 
 The ADE provides visibility into your agent's decision-making process, showing you exactly when and how it uses your custom memory tools.
 
-## Next Steps
+## Next steps
 
 Now that you've integrated external memory storage with Letta, you can expand on this foundation:
 
 <CardGroup cols={2}>
   <Card
-    title="Custom Tools"
+    title="Custom tools"
     icon="fa-sharp fa-light fa-wrench"
     href="/tools"
     iconPosition="left"
@@ -3232,7 +3235,7 @@ Now that you've integrated external memory storage with Letta, you can expand on
     Learn more about creating custom tools for your agents.
   </Card>
   <Card
-    title="Agent Configuration"
+    title="Agent configuration"
     icon="fa-sharp fa-light fa-robot"
     href="/agents"
     iconPosition="left"
@@ -3248,7 +3251,7 @@ Now that you've integrated external memory storage with Letta, you can expand on
     Build retrieval-augmented generation systems with Letta.
   </Card>
   <Card
-    title="Multi-Agent Systems"
+    title="Multi-agent systems"
     icon="fa-sharp fa-light fa-users"
     href="/guides/multi-agent"
     iconPosition="left"
