@@ -31,11 +31,10 @@ To follow along, you need free accounts for:
 
 You will also need Python 3.8+ or Node.js 18+ and a code editor.
 
-## Getting Your API Keys
+## Getting Your API Key
 
-We'll need API keys for Letta and n8n.
+We'll need an API key for Letta.
 
-<AccordionGroup>
 <Accordion title="Get your Letta API Key">
 <Steps>
   <Step title="Create a Letta Account">
@@ -51,32 +50,30 @@ We'll need API keys for Letta and n8n.
 </Steps>
 </Accordion>
 
-<Accordion title="Get your n8n Account Ready">
-<Steps>
-  <Step title="Sign Up for n8n Cloud">
-    If you don't have an account, sign up at [n8n.io](https://n8n.io). You'll get a 14-day free trial of n8n Cloud.
-  </Step>
-  <Step title="Create a Google Sheet">
-    Create a new Google Sheet called "Support Tickets" with these columns:
-    - `Ticket ID` (Column A)
-    - `Customer Name` (Column B)
-    - `Customer Email` (Column C)
-    - `Subject` (Column D)
-    - `Description` (Column E)
-    - `Priority` (Column F)
-  </Step>
-  <Step title="Connect Slack Workspace">
-    Make sure you have access to a Slack workspace where you can receive notifications. You'll connect it to n8n in Step 2.
-  </Step>
-</Steps>
-</Accordion>
-</AccordionGroup>
-
 Once you have these credentials, create a `.env` file in your project directory:
 
 ```bash
 LETTA_API_KEY=your_letta_api_key_here
 ```
+
+## Prepare Dependencies
+<Steps>
+  <Step>
+    If you don't have an account, sign up at [n8n.io](https://n8n.io). You'll get a 14-day free trial of n8n Cloud.
+  </Step>
+  <Step>
+    Create a new Google Sheet called "Support Tickets" with these columns:
+      - `Ticket ID` (Column A)
+      - `Customer Name` (Column B)
+      - `Customer Email` (Column C)
+      - `Subject` (Column D)
+      - `Description` (Column E)
+      - `Priority` (Column F)
+  </Step>
+  <Step>
+    Make sure you have access to a Slack workspace where you can receive notifications. You'll connect it to n8n in Step 2.
+  </Step>
+</Steps>
 
 ## Step 1: Create the Letta Agent
 
@@ -685,7 +682,7 @@ Now we'll connect your Letta agent to n8n to create the automated workflow.
 
 <Steps>
   <Step title="Create a New Workflow">
-    In n8n, click **Create workflow** or navigate to an existing workflow.
+    In your n8n instance, click **Create workflow** or navigate to an existing workflow.
 
     ![Create n8n Workflow](/images/letta-n8n/n8n-create-workflow.png)
   </Step>
