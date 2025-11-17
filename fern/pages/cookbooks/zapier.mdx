@@ -10,8 +10,9 @@ By the end of this tutorial, you'll have a support ticket routing system that ad
 
 We'll create a customer support workflow that demonstrates how to add Letta agents to Zapier automations:
 
-```
-Google Sheets (New Ticket) -> Letta Agent (Intelligence Layer) -> Slack (Notification)
+```mermaid
+graph LR
+    A["Google Sheets<br/>(New Ticket)"] --> B["Letta Agent<br/>(Intelligence Layer)"] --> C["Slack<br/>(Notification)"]
 ```
 
 The Letta agent sits between your trigger and action, analyzing each ticket with full context from previous interactions. This approach adds intelligence to your workflow without replacing your existing tools.
@@ -27,9 +28,7 @@ To follow along, you need free accounts for:
 
 You will also need Python 3.8+ or Node.js 18+ and a code editor.
 
-## Getting Your API Keys
-
-We'll need API keys for Letta and Zapier.
+## Getting Your Letta API Key
 
 <AccordionGroup>
 <Accordion title="Get your Letta API Key">
@@ -39,40 +38,38 @@ We'll need API keys for Letta and Zapier.
   </Step>
   <Step title="Navigate to API Keys">
     Once logged in, click on **API keys** in the sidebar.
-    ![Letta API Key Navigation](/images/letta-zapier/letta-api-key-nav.png)
+    ![Letta API Key Navigation](../../images/letta-zapier/letta-api-key-nav.png)
   </Step>
   <Step title="Create and Copy Your Key">
     Click **+ Create API key**, give it a descriptive name (e.g., "Zapier Integration"), and click **Confirm**. Copy the key and save it somewhere safe.
   </Step>
 </Steps>
 </Accordion>
-
-<Accordion title="Get your Zapier Account Ready">
-<Steps>
-  <Step title="Sign Up for Zapier">
-    If you don't have an account, sign up at [zapier.com](https://zapier.com). The free tier works for this tutorial.
-  </Step>
-  <Step title="Create a Google Sheet">
-    Create a new Google Sheet called "Support Tickets" with these columns:
-    - `Ticket ID` (Column A)
-    - `Customer Name` (Column B)
-    - `Customer Email` (Column C)
-    - `Subject` (Column D)
-    - `Description` (Column E)
-    - `Priority` (Column F)
-  </Step>
-  <Step title="Connect Slack Workspace">
-    Make sure you have access to a Slack workspace where you can receive notifications. You'll connect it to Zapier in Step 3.
-  </Step>
-</Steps>
-</Accordion>
 </AccordionGroup>
 
-Once you have these credentials, create a `.env` file in your project directory:
+Once you have your API key, create a `.env` file in your project directory:
 
 ```bash
 LETTA_API_KEY=your_letta_api_key_here
 ```
+## Prepare Dependencies
+<Steps>
+  <Step>
+    If you don't have an account, sign up at [zapier.com](https://zapier.com). The free tier works for this tutorial.
+  </Step>
+  <Step>
+    Create a new Google Sheet called "Support Tickets" with these columns:
+      - `Ticket ID` (Column A)
+      - `Customer Name` (Column B)
+      - `Customer Email` (Column C)
+      - `Subject` (Column D)
+      - `Description` (Column E)
+      - `Priority` (Column F)
+  </Step>
+  <Step>
+    Make sure you have access to a Slack workspace where you can receive notifications. You'll connect it to Zapier in Step 3.
+  </Step>
+</Steps>
 
 ## Step 1: Create the Letta Agent
 
@@ -719,11 +716,11 @@ You can also view your agent in Letta's Agent Development Environment (ADE), a v
 
 1. Go to [https://app.letta.com](https://app.letta.com) and sign in with your Letta account
 
-2. You'll see your agents list. Find your **Support Ticket Router** agent
+2. Click "Agents" on the left navigation bar. Find your **Support Ticket Router** agent
 
    ![Agent List](/images/letta-zapier/zapier-agent-list.png)
 
-3. Click on the agent to open it in the ADE
+3. Click on "Open in ADE"
 
    ![Agent in ADE](/images/letta-zapier/zapier-agent-ade-view.png)
 
@@ -751,7 +748,7 @@ Now we'll connect your Letta agent to Zapier to create the automated workflow.
 
 <Steps>
   <Step title="Create a New Zap">
-    In Zapier, click **+ Create** -> **Zap**.
+    In Zapier, click **+ Create** -> **Zaps**.
 
     ![Create Zap Button](/images/letta-zapier/zapier-create-zap.png)
   </Step>
@@ -788,10 +785,9 @@ This step sends the ticket data to your Letta agent for analysis.
 
 <Steps>
   <Step title="Add a Webhooks Action">
-    1. Click the **+** button to add an action
-    2. Search for and select **Webhooks by Zapier**
-    3. Choose action event: **Custom Request**
-    4. Click **Continue**
+    1. Search for and select **Webhooks by Zapier**
+    2. Choose action event: **Custom Request**
+    3. Click **Continue**
   </Step>
 
   <Step title="Configure the Request Method and URL">
@@ -902,13 +898,14 @@ This step sends the ticket data to your Letta agent for analysis.
     - For the Letta AI response: Click the "Messages 0 Content: No data" warning → **Previous Steps** tab → **2. Custom Request in Webhooks by...** → Select **Messages Content**
 
     ![Slack Message Configuration](/images/letta-zapier/zapier-slack-config.png)
+
+    3. Click **Continue**
   </Step>
 
   <Step title="Test the Slack Action">
     1. Click **Test step**
     2. Check your Slack channel
     3. You should see a formatted message with the ticket details and agent recommendation
-    4. Click **Continue**
 
     ![Slack Test Message](/images/letta-zapier/zapier-slack-test.png)
   </Step>
