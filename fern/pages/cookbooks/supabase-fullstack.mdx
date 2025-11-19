@@ -6,7 +6,7 @@ slug: cookbooks/integrations/supabase
 
 When building with Letta, you need to understand where it fits in your stack. Letta is an AI runtime environment that manages agent memory and conversations. This guide shows you how Letta integrates with your UI layer (Next.js) and database (Supabase) to build a complete application architecture.
 
-This guide uses Letta's [Next.js chatbot template]https://github.com/letta-ai/letta-chatbot-example), which has no backend, and adds a Supabase project to create a production-ready application with persistent storage and multi-user support. By the end, you'll understand how each piece works together.
+This guide uses Letta's [Next.js chatbot template](https://github.com/letta-ai/letta-chatbot-example), which has no backend, and adds a Supabase project to create a production-ready application with persistent storage and multi-user support. By the end, you'll understand how each piece works together.
 
 Here's what we'll build:
 
@@ -379,7 +379,7 @@ export async function getUserByCookieUid(cookieUid: string): Promise<User | null
 }
 ```
 
-The `createUser` function inserts a new user row with links to both the cookie UID and the Letta Identity. The `getUserByCookieUid` function retrieves a user by their session cookie. The special error code, `PGRST116,` occurs when no rows are returned, which we handle by returning `null` instead of throwing an error.
+The `createUser` function inserts a new user row with links to both the cookie UID and the Letta Identity. The `getUserByCookieUid` function retrieves a user by their session cookie. The special error code `PGRST116` occurs when no rows are returned. We handle this by returning `null` instead of throwing an error.
 
 Continue writing the service file by adding the following agent operations:
 
