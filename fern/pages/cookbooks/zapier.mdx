@@ -1,47 +1,47 @@
 ---
 title: Connecting Zapier and Letta
-subtitle: Integrate stateful agents into existing automation without rebuilding your tech stack
+subtitle: Integrate stateful agents into existing automation flows without rebuilding your tech stack
 slug: workflows/zapier
 ---
 
-By the end of this tutorial, you'll have a support ticket routing system that adds Letta's stateful AI agents to your existing Zapier workflows. Your agent will remember customer history, learn routing patterns, and provide intelligent recommendations.
+Letta's stateful AI agents can enrich existing Zapier workflows. This guide demonstrates how to create a routing system for customer support tickets by integrating Zapier automation with a Letta agent. The agent remembers customer history, learns routing patterns, and provides intelligent recommendations.
 
-## What You'll Build
+## What you'll build
 
-We'll create a customer support workflow that demonstrates how to add Letta agents to Zapier automations:
+You'll create the following customer support workflow, and in doing so, learn to add Letta agents to Zapier automations:
 
 ```mermaid
 graph LR
-    A["Google Sheets<br/>(New Ticket)"] --> B["Letta Agent<br/>(Intelligence Layer)"] --> C["Slack<br/>(Notification)"]
+    A["Google Sheets<br/>(New ticket)"] --> B["Letta agent<br/>(Intelligence layer)"] --> C["Slack<br/>(Notification)"]
 ```
 
 The Letta agent sits between your trigger and action, analyzing each ticket with full context from previous interactions. This approach adds intelligence to your workflow without replacing your existing tools.
 
 ## Prerequisites
 
-To follow along, you need free accounts for:
+To follow along, you need:
 
-- **[Letta Cloud](https://app.letta.com)** - To create and host your stateful agent
-- **[Zapier](https://zapier.com)** - For workflow automation (free trial or Pro plan required for Webhooks)
-- **[Google Sheets](https://sheets.google.com)** - For the ticket submission trigger
-- **[Slack](https://slack.com)** - For team notifications (or any messaging app Zapier supports)
+- **A free [Letta Cloud](https://app.letta.com) account:** For creating and hosting your stateful agent
+- **A [Zapier](https://zapier.com) account:** For workflow automation (a free trial or **Pro** plan is required for Webhooks)
+- **[Google Sheets](https://sheets.google.com):** For the ticket submission trigger
+- **[Slack](https://slack.com) (or any messaging app Zapier supports):** For team notifications
+- **Python** (version 3.8 or later) or **Node.js** (version 18 or later)
+- **A code editor**
 
-You will also need Python 3.8+ or Node.js 18+ and a code editor.
-
-## Getting Your Letta API Key
+### Get your Letta API key
 
 <AccordionGroup>
-<Accordion title="Get your Letta API Key">
+<Accordion title="Get your Letta API key">
 <Steps>
-  <Step title="Create a Letta Account">
+  <Step title="Create a Letta account">
     If you don't have one, sign up for a free account at [letta.com](https://www.letta.com).
   </Step>
-  <Step title="Navigate to API Keys">
+  <Step title="Navigate to API keys">
     Once logged in, click on **API keys** in the sidebar.
     ![Letta API Key Navigation](../../images/letta-zapier/letta-api-key-nav.png)
   </Step>
-  <Step title="Create and Copy Your Key">
-    Click **+ Create API key**, give it a descriptive name (e.g., "Zapier Integration"), and click **Confirm**. Copy the key and save it somewhere safe.
+  <Step title="Create and copy your key">
+    Click **+ Create API key**, give it a descriptive name (such as `Zapier Integration`), and click **Confirm**. Copy the key and save it somewhere safe.
   </Step>
 </Steps>
 </Accordion>
@@ -52,13 +52,13 @@ Once you have your API key, create a `.env` file in your project directory:
 ```bash
 LETTA_API_KEY=your_letta_api_key_here
 ```
-## Prepare Dependencies
+### Prepare the project dependencies
 <Steps>
   <Step>
     If you don't have an account, sign up at [zapier.com](https://zapier.com). The free tier works for this tutorial.
   </Step>
   <Step>
-    Create a new Google Sheet called "Support Tickets" with these columns:
+    Create a new Google Sheet, called `Support Tickets`, with the following columns:
       - `Ticket ID` (Column A)
       - `Customer Name` (Column B)
       - `Customer Email` (Column C)
@@ -67,26 +67,26 @@ LETTA_API_KEY=your_letta_api_key_here
       - `Priority` (Column F)
   </Step>
   <Step>
-    Make sure you have access to a Slack workspace where you can receive notifications. You'll connect it to Zapier in Step 3.
+    Make sure you have access to a Slack workspace where you can receive notifications (you'll connect the workspace to Zapier in Step 3).
   </Step>
 </Steps>
 
-## Step 1: Create the Letta Agent
+## Step 1: Create the Letta agent
 
-First, we'll create a Letta agent configured with memory blocks for customer history and routing knowledge.
+First, configure a Letta agent with memory blocks for customer history and routing knowledge.
 
-### Install Dependencies
+### Install the dependencies
 
 <Tabs>
 <Tab title="Python" language="python">
-Create a `requirements.txt` file:
+Create a `requirements.txt` file that contains the following dependencies:
 
 ```txt
 letta-client
 python-dotenv
 ```
 
-Install the dependencies:
+Run the following code to install the dependencies:
 
 ```bash
 pip install -r requirements.txt
@@ -94,7 +94,7 @@ pip install -r requirements.txt
 </Tab>
 
 <Tab title="TypeScript" language="typescript">
-Create a `package.json` file:
+Create a `package.json` file with the following contents:
 
 ```json
 {
@@ -118,7 +118,7 @@ Create a `package.json` file:
 }
 ```
 
-Create a `tsconfig.json` file:
+Create a `tsconfig.json` file with the following contents:
 
 ```json
 {
@@ -150,17 +150,17 @@ npm install
 </Tab>
 </Tabs>
 
-### Create the Agent Script
+### Create the agent script
 
 Create a script to initialize your Letta agent with three memory blocks:
 
-- **persona** - Defines the agent's role and behavior
-- **routing_knowledge** - Tracks patterns about ticket routing
-- **customer_history** - Maintains memory of customer interactions
+- A `persona` block to define the agent's role and behavior
+- A `routing_knowledge` block to track ticket-routing patterns
+- A `customer_history` block to maintain the memory of customer interactions
 
 <Tabs>
 <Tab title="Python" language="python">
-Create a file named `create-agent.py`:
+Create a file named `create-agent.py` and add the following code to it:
 
 ```python
 """
@@ -252,7 +252,7 @@ if __name__ == "__main__":
 </Tab>
 
 <Tab title="TypeScript" language="typescript">
-Create a file named `create-agent.ts`:
+Create a file named `create-agent.ts` and add the following code to it:
 
 ```typescript
 /**
@@ -346,7 +346,7 @@ createSupportAgent().catch((error) => {
 </Tab>
 </Tabs>
 
-### Run the Agent Creation Script
+### Run the agent creation script
 
 <CodeBlocks>
 ```bash title="Python" language="python"
@@ -358,7 +358,7 @@ npx tsx create-agent.ts
 ```
 </CodeBlocks>
 
-You should see output like this:
+You should see the following output:
 
 ```
 Connected to Letta Cloud
@@ -368,27 +368,27 @@ Add this to your .env file:
 LETTA_AGENT_ID=agent-abc123def456
 ```
 
-### Save the Agent ID
+### Save the agent ID
 
-Copy the agent ID and add it to your `.env` file:
+Copy your agent ID from the output above and add it to your `.env` file:
 
 ```bash
 LETTA_API_KEY=your_letta_api_key_here
 LETTA_AGENT_ID=agent-abc123def456
 ```
 
-### Test Your Agent
+### Test your agent
 
-Before connecting to Zapier, you can test that your agent analyzes tickets correctly.
+Before connecting to Zapier, test that your agent analyzes tickets correctly.
 
 <AccordionGroup>
-<Accordion title="Create the Test Script">
+<Accordion title="Create the test script">
 
 This script sends sample support tickets to your agent and displays the routing recommendations.
 
 <Tabs>
 <Tab title="Python" language="python">
-Create a file named `test-ticket.py`:
+Create a file named `test-ticket.py` and add the following code to it:
 
 ```python
 """
@@ -516,7 +516,7 @@ if __name__ == "__main__":
 </Tab>
 
 <Tab title="TypeScript" language="typescript">
-Create a file named `test-ticket.ts`:
+Create a file named `test-ticket.ts` and add the following code to it:
 
 ```typescript
 /**
@@ -667,7 +667,7 @@ main().catch((error) => {
 
 </Accordion>
 
-<Accordion title="Run the Test Script">
+<Accordion title="Run the test script">
 
 <CodeBlocks>
 ```bash title="Python" language="python"
@@ -710,28 +710,28 @@ If you see context-aware responses, your agent is working correctly.
 
 </Accordion>
 
-<Accordion title="View Your Agent in the ADE">
+<Accordion title="View your agent in the ADE">
 
 You can also view your agent in Letta's Agent Development Environment (ADE), a visual interface for managing and inspecting agents.
 
 1. Go to [https://app.letta.com](https://app.letta.com) and sign in with your Letta account
 
-2. Click "Agents" on the left navigation bar. Find your **Support Ticket Router** agent
+2. In the left navigation bar, click **Agents**. Find your **Support Ticket Router** agent.
 
    ![Agent List](/images/letta-zapier/zapier-agent-list.png)
 
-3. Click on "Open in ADE"
+3. Click **Open in ADE**.
 
    ![Agent in ADE](/images/letta-zapier/zapier-agent-ade-view.png)
 
-4. In the ADE, you can inspect your agent's configuration:
-   - **Memory blocks** (persona, routing_knowledge, customer_history) in the right panel
-   - **System instructions** and behavior settings in the left panel
-   - **Chat interface** in the center where the agent will process tickets
+4. In the ADE, you can inspect your agent's configuration, including its:
+   - **Memory blocks:** In the **Core Memory** panel on the right (**persona**, **routing_knowledge**, and **customer_history**)
+   - **System instructions:** In the **Agent Settings** panel on the left (and other behavior settings)
+   - **Chat interface:** In the center, where the agent processes tickets
 
-5. If you ran the test script, you can see the conversation history and responses in the chat interface
+5. If you ran the test script, you can see the conversation history and responses in the chat interface:
 
-   ![Agent Chat History in ADE](/images/letta-zapier/zapier-agent-chat-history.png)
+   ![Agent chat history in ADE](/images/letta-zapier/zapier-agent-chat-history.png)
 
 The ADE provides full visibility into your agent's configuration and state. When your Zapier workflow runs, you can return to the ADE to see how the agent's memory evolves as it processes real support tickets.
 
@@ -744,55 +744,57 @@ The ADE provides full visibility into your agent's configuration and state. When
 
 Now we'll connect your Letta agent to Zapier to create the automated workflow.
 
-### Create the Google Sheets Trigger
+### Create the Google Sheets trigger
 
 <Steps>
-  <Step title="Create a New Zap">
-    In Zapier, click **+ Create** -> **Zaps**.
+  <Step title="Create a new Zap">
+    In Zapier, click **+ Create** and select **Zaps**.
 
-    ![Create Zap Button](/images/letta-zapier/zapier-create-zap.png)
+    ![Create Zap button](/images/letta-zapier/zapier-create-zap.png)
   </Step>
 
-  <Step title="Set Up the Trigger">
-    1. Choose trigger app: **Google Sheets**
-    2. Choose trigger event: **New Spreadsheet Row**
-    3. Connect your Google account
-    4. Click **Continue**
+  <Step title="Set up the trigger">
 
-    ![Google Sheets Trigger](/images/letta-zapier/zapier-sheets-trigger.png)
+    - Set **Google Sheets** as the trigger **App**.
+    - Set **New Spreadsheet Row** as the **Trigger event**.
+    - Enter your Google user account under **Account**.
+    - Click **Continue**.
+
+    ![Google Sheets trigger](/images/letta-zapier/zapier-sheets-trigger.png)
   </Step>
 
-  <Step title="Configure the Trigger">
-    1. Select the **Support Tickets** spreadsheet you created earlier
-    2. Choose **Sheet1** as the worksheet
+  <Step title="Configure the trigger">
+    - Set the **Support Tickets** file you created earlier as the **Spreadsheet**.
+    - Set **Sheet1** as the **Worksheet**.
 
     ![Connect Google Sheets](/images/letta-zapier/zapier-connect-sheets.png)
   </Step>
 
-  <Step title="Test the Trigger">
-    1. Add a sample row to your Google Sheet with test data
-    2. Click **Test trigger** in Zapier
-    3. Zapier should find your sample row
-    4. Click **Continue with selected record**
+  <Step title="Test the trigger">
+    - Add a sample row to your Google Sheet with test data.
+    - Click **Test trigger** in Zapier.
+    - Zapier should find your sample row.
+    - Click **Continue with selected record**.
 
     ![Test Trigger](/images/letta-zapier/zapier-test-trigger.png)
   </Step>
 </Steps>
 
-### Add the Letta Agent Action
+### Add the Letta agent action
 
-This step sends the ticket data to your Letta agent for analysis.
+Now you'll add the next step to your Zap. This step sends the ticket data to your Letta agent for analysis.
 
 <Steps>
-  <Step title="Add a Webhooks Action">
-    1. Search for and select **Webhooks by Zapier**
-    2. Choose action event: **Custom Request**
-    3. Click **Continue**
+  <Step title="Add a Webhooks action">
+    - Click the **+** button to add another action.
+    - Search for and select **Webhooks by Zapier**.
+    - Set **Custom Request** as the **Action event**.
+    - Click **Continue**.
   </Step>
 
-  <Step title="Configure the Request Method and URL">
-    1. In **Method**, select **POST**
-    2. In the **URL** field, enter:
+  <Step title="Configure the request method and URL">
+    - For **Method**, select **POST**
+    - In the **URL** field, enter the following:
 
     ```
     https://api.letta.com/v1/agents/YOUR_AGENT_ID_HERE/messages
@@ -807,7 +809,7 @@ This step sends the ticket data to your Letta agent for analysis.
     This setting ensures the response structure is preserved correctly for the next step.
   </Step>
 
-  <Step title="Configure the Request Body">
+  <Step title="Configure the request body">
     In the **Data** field, paste the following JSON structure:
 
     ```json
@@ -822,35 +824,35 @@ This step sends the ticket data to your Letta agent for analysis.
     ```
 
     <Note>
-    Zapier may show warnings like "No data" for unmapped fields. To fix these:
-    - Click on the warning (e.g., "Replace: Customer Email: No data")
-    - In the search dialog, select the **Previous Steps** tab
-    - Choose **1. New Spreadsheet Row in Google...** from the dropdown
-    - Select the corresponding field (e.g., **Customer Email**, **Customer Name**, **Subject**)
-    - Repeat for each `{{field}}` placeholder in your JSON
-    - Use the actual column names shown in the dropdown rather than generic references
+    Zapier may show warnings such as **No data** for unmapped fields. You can fix these as follows:
+    - Click on the warning (for example, **Replace: Customer Email: No data**).
+    - In the search dialog, select the **Previous Steps** tab.
+    - Choose **1. New Spreadsheet Row in Google...** from the dropdown.
+    - Select the corresponding field (for example, **Customer Email**, **Customer Name**, **Subject**).
+    - Repeat this for each `{{field}}` placeholder in your JSON.
+    - Use the actual column names shown in the dropdown rather than generic references.
     </Note>
 
-    ![Map Fields](/images/letta-zapier/zapier-map-fields.png)
+    ![Map fields](/images/letta-zapier/zapier-map-fields.png)
   </Step>
 
-  <Step title="Add Headers">
-    In the **Headers** section, add:
+  <Step title="Add headers">
+    In the **Headers** section, add an **Authorization** and a **Content-Type** header with the following values:
 
     | Header | Value |
     |--------|-------|
-    | `Authorization` | `Bearer YOUR_LETTA_API_KEY` |
-    | `Content-Type` | `application/json` |
+    | **Authorization** | `Bearer YOUR_LETTA_API_KEY` |
+    | **Content-Type** | `application/json` |
 
     Replace `YOUR_LETTA_API_KEY` with your actual Letta API key.
   </Step>
 
   <Step title="Test the Webhook">
-    1. Click **Test step**
-    2. Wait for the response (may take a few seconds)
-    3. You should see a response with a `messages` array
-    4. Expand the response to verify the agent's routing recommendation is present
-    5. Click **Continue**
+    - Click **Test step**.
+    - Wait for the response (it may take a few seconds).
+    - You should see a response with a `messages` array.
+    - Expand the response to check that the agent's routing recommendation is present.
+    - Click **Continue**.
 
     You can also verify the test worked by checking your agent in the ADE at [https://app.letta.com](https://app.letta.com). You should see the test ticket in the conversation history.
 
@@ -858,20 +860,22 @@ This step sends the ticket data to your Letta agent for analysis.
   </Step>
 </Steps>
 
-### Add the Slack Notification Action
+### Add the Slack notification action
+
+Next, create the step that sends a notification to Slack.
 
 <Steps>
-  <Step title="Add a Slack Action">
-    1. Click the **+** button to add another action
-    2. Search for and select **Slack**
-    3. Choose action event: **Send Channel Message**
-    4. Connect your Slack workspace
-    5. Click **Continue**
+  <Step title="Add a Slack action">
+    - Click the **+** button to add another action.
+    - Search for and select **Slack**.
+    - Set **Send Channel Message** as the **Action event**.
+    - Connect your Slack workspace.
+    - Click **Continue**.
   </Step>
 
-  <Step title="Configure the Slack Message">
-    1. **Channel**: Select your channel (e.g., `#support`)
-    2. **Message Text**: Use the following format and map fields from previous steps:
+  <Step title="Configure the Slack message">
+    - For **Channel**, select your channel (for example, `#support`).
+    - For **Message Text**, use the following format and map the fields from previous steps:
 
     ```
     *New Support Ticket*
@@ -892,41 +896,40 @@ This step sends the ticket data to your Letta agent for analysis.
     View in Google Sheets
     ```
 
-    To map the fields:
-    - Click in the message text area where you want to insert a field
-    - For Google Sheets data (Customer Name, Email, Subject, etc.): Click the warning or field placeholder → **Previous Steps** tab → **1. New Spreadsheet Row in Google...** → Select the field
-    - For the Letta AI response: Click the "Messages 0 Content: No data" warning → **Previous Steps** tab → **2. Custom Request in Webhooks by...** → Select **Messages Content**
+    - Map the fields as follows:
+      - **For Google Sheets data (such as `Customer Name`, `Email`, and `Subject`):** First, click on the warning or on the field placeholder in the message text to open the dialog. Then, click the **Previous Steps** tab, expand the **1. New Spreadsheet Row in Google...** option, and select the appropriate field.
+      - **For the Letta AI response:** First, click on the **Messages 0 Content: No data** warning to open the dialog. Then, click the **Previous Steps** tab, expand the **2. Custom Request in Webhooks by...** option, and select **Messages Content**.
 
     ![Slack Message Configuration](/images/letta-zapier/zapier-slack-config.png)
 
-    3. Click **Continue**
+    - Click **Continue**.
   </Step>
 
-  <Step title="Test the Slack Action">
-    1. Click **Test step**
-    2. Check your Slack channel
-    3. You should see a formatted message with the ticket details and agent recommendation
+  <Step title="Test the Slack action">
+    - Click **Test step**.
+    - Check your Slack channel.
+    - You should see a formatted message with the ticket details and agent recommendation:
 
     ![Slack Test Message](/images/letta-zapier/zapier-slack-test.png)
   </Step>
 </Steps>
 
-### Publish Your Zap
+### Publish your Zap
 
 <Steps>
-  <Step title="Name Your Zap">
-    Click the title at the top and rename it to something descriptive like "Intelligent Support Ticket Routing with Letta"
+  <Step title="Name your Zap">
+    Click the title at the top and rename it something descriptive, like `Intelligent Support Ticket Routing with Letta`.
   </Step>
 
-  <Step title="Turn On the Zap">
-    1. Click **Publish** in the top right
-    2. Toggle the Zap to **ON**
+  <Step title="Turn the Zap on">
+    - Click **Publish** in the top right corner.
+    - Toggle the Zap to **On**.
   </Step>
 </Steps>
 
 Your Zapier workflow is now live and will process new support tickets automatically.
 
-## Testing the Complete Flow
+## Testing the complete flow
 
 Add an example ticket to your Google Sheet:
 
@@ -934,26 +937,30 @@ Add an example ticket to your Google Sheet:
 |-----------|---------------|----------------|---------|-------------|----------|-----------|
 | 1 | James Doe | james@example.com | Cannot access account | Getting an error when logging in | High | 2025-01-15 10:30 AM |
 
-Wait 1-2 minutes (Zapier polls every 1-15 minutes depending on your plan). You should receive a Slack notification with:
+Wait one to two minutes (Zapier polls every 1-15 minutes depending on your plan). You should receive a Slack notification with the following information:
 
 - The ticket details from Google Sheets
 - Letta's intelligent routing recommendation with reasoning
 - A suggested response message
-- Estimated resolution time
+- An estimated resolution time
 
 Try adding another ticket from the same customer. The agent will remember the first interaction and provide context-aware routing based on the customer's history.
 
-![Complete Flow Example](/images/letta-zapier/zapier-complete-flow.png)
+![Complete flow example](/images/letta-zapier/zapier-complete-flow.png)
 
-## Next Steps
+## Next steps
 
-Now that you've integrated a Letta agent into your Zapier workflow, you can apply this same pattern to other use cases like lead qualification, content moderation, or expense approval. Each workflow follows the same structure: a trigger sends data to your Letta agent, the agent processes it with context and memory, and the response triggers the next action.
+Now that you've integrated a Letta agent into your Zapier workflow, you can apply this same pattern to other use cases, such as lead qualification, content moderation, or expense approval. Each workflow follows the same structure:
 
-To extend what you've built, explore these guides:
+- A trigger sends data to your Letta agent.
+- The agent processes it with context and memory.
+- The response triggers the next action.
+
+Explore these guides to see how you can extend what you've built:
 
 <CardGroup cols={2}>
   <Card
-    title="Custom Tools"
+    title="Custom tools"
     icon="fa-sharp fa-light fa-wrench"
     href="/guides/agents/custom-tools"
     iconPosition="left"
@@ -961,7 +968,7 @@ To extend what you've built, explore these guides:
     Learn how to create custom tools to extend your agent's capabilities beyond message handling.
   </Card>
   <Card
-    title="Memory Management"
+    title="Memory management"
     icon="fa-sharp fa-light fa-brain"
     href="/guides/agents/memory"
     iconPosition="left"
