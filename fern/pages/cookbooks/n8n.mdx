@@ -4,65 +4,65 @@ subtitle: Integrate stateful agents into existing automation without rebuilding 
 slug: workflows/n8n
 ---
 
-By the end of this tutorial, you'll have a support ticket routing system that adds Letta's stateful AI agents to your n8n workflows. Your agent will remember customer history, learn routing patterns, and provide intelligent recommendations.
+Letta's stateful AI agents can enrich n8n workflows. This guide demonstrates how to create a routing system for customer support tickets by integrating n8n automation with a Letta agent. The agent remembers customer history, learns routing patterns, and provides intelligent recommendations.
 
 Both n8n and Letta can be self-hosted if you need to run them on your own infrastructure (we'll cover self-hosting in a future guide).
 
-## What You'll Build
+## What you'll build
 
-We'll create a customer support workflow that demonstrates how to add Letta agents to n8n automations:
+You'll create the following customer support workflow, and in doing so, learn to add Letta agents to n8n automations:
 
 ```mermaid
 graph LR
-    A[Google Sheets<br/>New Row] --> B[Letta Agent<br/>Intelligence Layer]
+    A[Google Sheets<br/>New row] --> B[Letta agent<br/>Intelligence layer]
     B --> C[Slack<br/>Notification]
 ```
 
-The Letta agent sits between your trigger and action, analyzing each ticket with full context from previous interactions. You'll build this visually on n8n's canvas by connecting nodes—no complex configuration required.
+The Letta agent sits between your trigger and action, analyzing each ticket with full context from previous interactions. You'll build this visually in the n8n canvas by connecting nodes — no complex configuration required.
 
 ## Prerequisites
 
-To follow along, you need free accounts for:
+To follow along, you need:
 
-- **[Letta Cloud](https://app.letta.com)** - To create and host your stateful agent
-- **[n8n Cloud](https://n8n.io)** - For workflow automation (14-day free trial, then $24/month)
-- **[Google Sheets](https://sheets.google.com)** - For the ticket submission trigger
-- **[Slack](https://slack.com)** - For team notifications (or any messaging app n8n supports)
+- **A free [Letta Cloud](https://app.letta.com) account:** For creating and hosting your stateful agent
+- **A [n8n Cloud](https://n8n.io) account:** For workflow automation (14-day free trial available, then $24/month)
+- **[Google Sheets](https://sheets.google.com):** For the ticket submission trigger
+- **[Slack](https://slack.com) (or any messaging app n8n supports):** For team notifications
+- **Python** (version 3.8 or later) or **Node.js** (version 18 or later)
+- **A code editor**
 
-You will also need Python 3.8+ or Node.js 18+ and a code editor.
+### Get your API key
 
-## Getting Your API Key
+You need an API key for Letta.
 
-We'll need an API key for Letta.
-
-<Accordion title="Get your Letta API Key">
+<Accordion title="Get your Letta API key">
 <Steps>
-  <Step title="Create a Letta Account">
+  <Step title="Create a Letta account">
     If you don't have one, sign up for a free account at [letta.com](https://www.letta.com).
   </Step>
-  <Step title="Navigate to API Keys">
+  <Step title="Navigate to API keys">
     Once logged in, click on **API keys** in the sidebar.
-    ![Letta API Key Navigation](/images/letta-n8n/letta-api-key-nav.png)
+    ![Letta API key navigation](/images/letta-n8n/letta-api-key-nav.png)
   </Step>
-  <Step title="Create and Copy Your Key">
-    Click **+ Create API key**, give it a descriptive name (e.g., "n8n Integration"), and click **Confirm**. Copy the key and save it somewhere safe.
+  <Step title="Create and copy your key">
+    Click **+ Create API key**, give it a descriptive name (such as `n8n Integration`), and click **Confirm**. Copy the key and save it somewhere safe.
   </Step>
 </Steps>
 </Accordion>
 
-Once you have these credentials, create a `.env` file in your project directory:
+Once you have these credentials, create a `.env` file in your project directory and add your API key as an environment variable:
 
 ```bash
 LETTA_API_KEY=your_letta_api_key_here
 ```
 
-## Prepare Dependencies
+### Prepare the dependencies
 <Steps>
   <Step>
-    If you don't have an account, sign up at [n8n.io](https://n8n.io). You'll get a 14-day free trial of n8n Cloud.
+    If you don't have an account, sign up at [n8n.io](https://n8n.io) to get a 14-day free trial of n8n Cloud.
   </Step>
   <Step>
-    Create a new Google Sheet called "Support Tickets" with these columns:
+    Create a new Google Sheet called `Support Tickets` with the following columns:
       - `Ticket ID` (Column A)
       - `Customer Name` (Column B)
       - `Customer Email` (Column C)
@@ -71,26 +71,26 @@ LETTA_API_KEY=your_letta_api_key_here
       - `Priority` (Column F)
   </Step>
   <Step>
-    Make sure you have access to a Slack workspace where you can receive notifications. You'll connect it to n8n in Step 2.
+    Make sure you have access to a Slack workspace where you can receive notifications (you'll connect the workspace to n8n in Step 2).
   </Step>
 </Steps>
 
-## Step 1: Create the Letta Agent
+## Step 1: Create the Letta agent
 
-First, we'll create a Letta agent configured with memory blocks for customer history and routing knowledge.
+First, configure a Letta agent with memory blocks for customer history and routing knowledge.
 
-### Install Dependencies
+### Install the dependencies
 
 <Tabs>
 <Tab title="Python" language="python">
-Create a `requirements.txt` file:
+Create a `requirements.txt` file that contains the following dependencies:
 
 ```txt
 letta-client
 python-dotenv
 ```
 
-Install the dependencies:
+Run the following code to install the dependencies:
 
 ```bash
 pip install -r requirements.txt
@@ -98,7 +98,7 @@ pip install -r requirements.txt
 </Tab>
 
 <Tab title="TypeScript" language="typescript">
-Create a `package.json` file:
+Create a `package.json` file with the following contents:
 
 ```json
 {
@@ -122,7 +122,7 @@ Create a `package.json` file:
 }
 ```
 
-Create a `tsconfig.json` file:
+Create a `tsconfig.json` file with the following contents:
 
 ```json
 {
@@ -154,17 +154,17 @@ npm install
 </Tab>
 </Tabs>
 
-### Create the Agent Script
+### Create the agent script
 
 Create a script to initialize your Letta agent with three memory blocks:
 
-- **persona** - Defines the agent's role and behavior
-- **routing_knowledge** - Tracks patterns about ticket routing
-- **customer_history** - Maintains memory of customer interactions
+- A `persona` block to define the agent's role and behavior
+- A `routing_knowledge` block to track ticket-routing patterns
+- A `customer_history` block to maintain the memory of customer interactions
 
 <Tabs>
 <Tab title="Python" language="python">
-Create a file named `create-agent.py`:
+Create a file named `create-agent.py` and add the following code to it:
 
 ```python
 import os
@@ -240,7 +240,7 @@ if __name__ == "__main__":
 </Tab>
 
 <Tab title="TypeScript" language="typescript">
-Create a file named `create-agent.ts`:
+Create a file named `create-agent.ts` and add the following code to it:
 
 ```typescript
 import { LettaClient } from '@letta-ai/letta-client';
@@ -318,7 +318,7 @@ createSupportAgent().catch((error) => {
 </Tab>
 </Tabs>
 
-### Run the Agent Creation Script
+### Run the agent creation script
 
 <CodeBlocks>
 ```bash title="Python" language="python"
@@ -330,7 +330,7 @@ npx tsx create-agent.ts
 ```
 </CodeBlocks>
 
-You should see output like:
+It should return an output similar to the following:
 
 ```
 Connected to Letta Cloud
@@ -340,27 +340,27 @@ Add this to your .env file:
 LETTA_AGENT_ID=agent-abc123def456
 ```
 
-### Save the Agent ID
+### Save the agent ID
 
-Copy the agent ID and add it to your `.env` file:
+Copy your agent ID from the output and add it to your `.env` file as follows:
 
 ```bash
 LETTA_API_KEY=your_letta_api_key_here
 LETTA_AGENT_ID=agent-abc123def456
 ```
 
-### Test Your Agent
+### Test your agent
 
-Before connecting to n8n, you can test that your agent analyzes tickets correctly.
+Before connecting to n8n, test whether your agent analyzes tickets correctly.
 
 <AccordionGroup>
-<Accordion title="Create the Test Script">
+<Accordion title="Create the test script">
 
 This script sends sample support tickets to your agent and displays the routing recommendations.
 
 <Tabs>
 <Tab title="Python" language="python">
-Create a file named `test-ticket.py`:
+Create a file named `test-ticket.py` and add the following code to it:
 
 ```python
 import os
@@ -473,7 +473,7 @@ if __name__ == "__main__":
 </Tab>
 
 <Tab title="TypeScript" language="typescript">
-Create a file named `test-ticket.ts`:
+Create a file named `test-ticket.ts` and add the following code to it:
 
 ```typescript
 import { LettaClient } from '@letta-ai/letta-client';
@@ -609,7 +609,7 @@ main().catch((error) => {
 
 </Accordion>
 
-<Accordion title="Run the Test Script">
+<Accordion title="Run the test script">
 
 <CodeBlocks>
 ```bash title="Python" language="python"
@@ -644,28 +644,28 @@ If you see context-aware responses, your agent is working correctly.
 
 </Accordion>
 
-<Accordion title="View Your Agent in the ADE">
+<Accordion title="View your agent in the ADE">
 
 You can also view your agent in Letta's Agent Development Environment (ADE), a visual interface for managing and inspecting agents.
 
-1. Go to [https://app.letta.com](https://app.letta.com) and sign in with your Letta account
+1. Go to [https://app.letta.com](https://app.letta.com) and sign in with your Letta account.
 
-2. You'll see your agents list. Find your **Support Ticket Router** agent
+2. You'll see your agents list. Find your **Support Ticket Router** agent.
 
-   ![Agent List](/images/letta-n8n/n8n-agent-list.png)
+   ![Agent list](/images/letta-n8n/n8n-agent-list.png)
 
-3. Click on the agent to open it in the ADE
+3. Click on the agent to open it in the ADE.
 
    ![Agent in ADE](/images/letta-n8n/n8n-agent-ade-view.png)
 
-4. In the ADE, you can inspect your agent's configuration:
-   - **Memory blocks** (persona, routing_knowledge, customer_history) in the right panel
-   - **System instructions** and behavior settings in the left panel
-   - **Chat interface** in the center where the agent will process tickets
+4. In the ADE, you can inspect your agent's configuration, including its:
+   - **Memory blocks:** In the **Core Memory** panel on the right (**persona**, **routing_knowledge**, and **customer_history**)
+   - **System instructions:** In the **Agent Settings** panel on the left (and other behavior settings)
+   - **Chat interface:** In the center, where the agent processes tickets
 
-5. If you ran the test script, you can see the conversation history and responses in the chat interface
+5. If you ran the test script, you can see the conversation history and responses in the chat interface.
 
-   ![Agent Chat History in ADE](/images/letta-n8n/n8n-agent-chat-history.png)
+   ![Agent chat history in ADE](/images/letta-n8n/n8n-agent-chat-history.png)
 
 The ADE provides full visibility into your agent's configuration and state. When your n8n workflow runs, you can return to the ADE to see how the agent's memory evolves as it processes real support tickets.
 
@@ -678,50 +678,50 @@ The ADE provides full visibility into your agent's configuration and state. When
 
 Now we'll connect your Letta agent to n8n to create the automated workflow.
 
-### Create the Google Sheets Trigger
+### Create the Google Sheets trigger
 
 <Steps>
-  <Step title="Create a New Workflow">
+  <Step title="Create a new workflow">
     In your n8n instance, click **Create workflow** or navigate to an existing workflow.
 
-    ![Create n8n Workflow](/images/letta-n8n/n8n-create-workflow.png)
+    ![Create n8n workflow](/images/letta-n8n/n8n-create-workflow.png)
   </Step>
 
-  <Step title="Add the Google Sheets Trigger">
-    1. Click the **+** button on the canvas
-    2. Search for and select **Google Sheets**
-    3. Choose trigger: **On row added**
-    4. In the **Credential to connect with** dropdown, select the dropdown, then select **+ Create new credential**. Click **Sign in with Google**.
-    5. In the **Document** dropdown, select your **Support Tickets** spreadsheet
-    6. In the **Sheet** dropdown, select **Sheet1** (or whatever your sheet is named)
-    7. Navigate to the **Settings** tab and toggle **Always Output Data** on
+  <Step title="Add the Google Sheets trigger">
+    - Click the **+** button on the canvas.
+    - Search for and select **Google Sheets**.
+    - In the **Trigger On** dropdown, select **Row Added**.
+    - In the **Credential to connect with** dropdown, select the dropdown, then select **+ Create new credential**, and click **Sign in with Google**.
+    - In the **Document** dropdown, select your **Support Tickets** spreadsheet.
+    - In the **Sheet** dropdown, select **Sheet1** (or whatever you've named your sheet).
+    - Navigate to the **Settings** tab and toggle **Always Output Data** on.
 
-    ![Google Sheets Trigger Setup](/images/letta-n8n/n8n-sheets-trigger-setup.png)
+    ![Google Sheets trigger setup](/images/letta-n8n/n8n-sheets-trigger-setup.png)
   </Step>
 
-  <Step title="Test the Trigger">
-    1. Add a sample row to your Google Sheet with test data
-    2. Click **Fetch Test Event** in n8n
-    3. n8n should find your sample row and display the data
-    4. Verify the field names match your column headers
+  <Step title="Test the trigger">
+    - Add a sample row to your Google Sheet with test data.
+    - Click **Fetch Test Event** in n8n.
+    - n8n should find your sample row and display the data.
+    - Verify that the field names match your column headers.
 
-    ![Test Google Sheets Trigger](/images/letta-n8n/n8n-test-sheets-trigger.png)
+    ![Test Google Sheets trigger](/images/letta-n8n/n8n-test-sheets-trigger.png)
   </Step>
 </Steps>
 
-### Add the Letta Agent Action
+### Add the Letta agent action
 
-This step sends the ticket data to your Letta agent for analysis.
+Now you'll add the next step to your workflow. This step sends the ticket data to your Letta agent for analysis.
 
 <Steps>
-  <Step title="Add an HTTP Request Node">
-    1. Click the **+** button on the canvas after the Google Sheets node
-    2. Search for and select **HTTP Request**
+  <Step title="Add an HTTP request node">
+    - Click the **+** button on the canvas, after the Google Sheets node.
+    - Search for and select **HTTP Request**.
   </Step>
 
-  <Step title="Configure the Request Method and URL">
-    1. In **Method**, select **POST**
-    2. In the **URL** field, enter:
+  <Step title="Configure the request method and URL">
+    - In the **Method** dropdown, select **POST**.
+    - In the **URL** field, enter the following:
 
     ```
     https://api.letta.com/v1/agents/YOUR_AGENT_ID_HERE/messages
@@ -730,24 +730,20 @@ This step sends the ticket data to your Letta agent for analysis.
     Replace `YOUR_AGENT_ID_HERE` with the agent ID from Step 1.
   </Step>
 
-  <Step title="Add Headers">
-    1. **Send Headers:** Toggle to **On**
-    2. Add the Authorization header:
-       - **Name:** `Authorization`
-       - **Value:** `Bearer YOUR_LETTA_API_KEY` (Replace `YOUR_LETTA_API_KEY` with your actual Letta API key)
-    4. Click **Add Parameter** to add another header:
-       - **Name:** `Content-Type`
-       - **Value:** `application/json`
+  <Step title="Add the headers">
+    - Toggle **Send Headers** on.
+    - Add the Authorization header by entering `Authorization` for the **Name** and `Bearer YOUR_LETTA_API_KEY` for the **Value**. (Replace `YOUR_LETTA_API_KEY` with your actual Letta API key.)
+    - Click **Add Parameter** to add another header, and enter `Content-Type` for the **Name** and `application/json` for the **Value**.
 
-    ![HTTP Request Headers](/images/letta-n8n/n8n-http-headers.png)
+    ![HTTP request headers](/images/letta-n8n/n8n-http-headers.png)
   </Step>
 
-  <Step title="Configure the Request Body">
-    1. **Send Body:** Toggle to **On**
-    2. **Body Content Type:** Select **Using JSON**
-    3. **Specify Body:** Select **Using JSON**
+  <Step title="Configure the request body">
+    - Toggle **Send Body** on.
+    - In the **Body Content Type** dropdown, select **Using JSON**
+    - In the **Specify Body** dropdown, select **Using JSON**
 
-    Click into the **JSON** field and paste:
+    - Click into the **JSON** field, then copy and paste the following contents of the request body:
 
     ```json
     {
@@ -764,42 +760,42 @@ This step sends the ticket data to your Letta agent for analysis.
     n8n uses `{{ $json.FieldName }}` syntax to reference data from the previous node. If your column headers have spaces, use bracket notation like `{{ $json['Customer Name'] }}`. Fields without spaces can use dot notation like `{{ $json.Subject }}`.
     </Note>
 
-    ![HTTP Request Body Configuration](/images/letta-n8n/n8n-http-body.png)
+    ![HTTP request body configuration](/images/letta-n8n/n8n-http-body.png)
   </Step>
 
-  <Step title="Test the HTTP Request">
-    1. Click **Execute step**
-    2. Wait for the response (may take a few seconds)
-    3. You should see a response with a `messages` array
-    4. Expand the response to verify the agent's routing recommendation is present in `messages[0].content`
+  <Step title="Test the HTTP request">
+    - Click **Execute step**.
+    - Wait for the response (it may take a few seconds).
+    - You should see a response with a `messages` array.
+    - Expand the response to verify that the agent's routing recommendation is present in `messages[0].content`.
 
-    You can also verify the test worked by checking your agent in the ADE at [https://app.letta.com](https://app.letta.com). You should see the test ticket in the conversation history.
+    You can also verify whether the test worked by checking your agent in the ADE at [https://app.letta.com](https://app.letta.com). You should see the test ticket in the conversation history.
 
-    ![HTTP Request Test Response](/images/letta-n8n/n8n-http-test-response.png)
+    ![HTTP request test response](/images/letta-n8n/n8n-http-test-response.png)
   </Step>
 </Steps>
 
-### Add the Slack Notification Action
+### Add the Slack notification action
 
 <Steps>
-  <Step title="Add a Slack Node">
-    1. Click the **+** button after the HTTP Request node
-    2. Search for and select **Slack**
-    3. Choose action: **Send a Message**
+  <Step title="Add a Slack node">
+    - Click the **+** button after the HTTP Request node.
+    - Search for and select **Slack**.
+    - Choose **Send a Message** as the action.
   </Step>
 
-  <Step title="Configure Slack Authentication">
-    1. In the **Credential to connect with** dropdown, select **+ Create new credential**
-    2. Click **Connect my account**
-    3. Follow the prompts to authorize n8n to access your Slack workspace
+  <Step title="Configure Slack authentication">
+    - In the **Credential to connect with** dropdown, select **+ Create new credential**.
+    - Click **Connect my account**.
+    - Follow the prompts to authorize n8n to access your Slack workspace.
   </Step>
 
-  <Step title="Configure the Slack Message">
-    1. **Resource:** `Message`
-    2. **Operation:** `Send`
-    3. **Send Message To:** **Channel**
-    4. **Channel:** Select or type your channel (e.g., `#support`)
-    4. **Message Text:** Click into the text field and build your message:
+  <Step title="Configure the Slack message">
+    - In the **Resource** dropdown, select **Message**.
+    - In the **Operation** dropdown, select **Send**.
+    - In the **Send Message To** dropdown, select **Channel**.
+    - Under **Channel**, select or type the name of your channel (for example, `#support`).
+    - Click into the **Message Text** field and build your message as follows:
 
     ```
     *New Support Ticket*
@@ -825,35 +821,35 @@ This step sends the ticket data to your Letta agent for analysis.
     </Note>
   </Step>
 
-  <Step title="Test the Slack Message">
-    1. Click **Execute step**
+  <Step title="Test the Slack message">
+    - Click **Execute step**.
 
-    ![Slack n8n Test](/images/letta-n8n/n8n-execute.slack-test.png)
+    ![Slack n8n test](/images/letta-n8n/n8n-execute.slack-test.png)
 
-    2. Check your Slack channel
-    3. You should see a formatted message with the ticket details and agent recommendation
+    - Check your Slack channel.
+    - You should see a formatted message with the ticket details and agent recommendation.
 
-    ![Slack Test Message](/images/letta-n8n/n8n-slack-test.png)
+    ![Slack test message](/images/letta-n8n/n8n-slack-test.png)
   </Step>
 </Steps>
 
-### Activate Your Workflow
+### Activate your workflow
 
 <Steps>
-  <Step title="Save Your Workflow">
-    Click **Save** in the top right and name your workflow (e.g., "Intelligent Support Ticket Routing")
+  <Step title="Save your workflow">
+    Click **Save** in the top right corner and name your workflow (for example, `Intelligent Support Ticket Routing`).
   </Step>
 
-  <Step title="Activate the Workflow">
-    1. Toggle the workflow to **Active** using the toggle in the top right
+  <Step title="Activate the workflow">
+    Toggle the workflow to **Active** using the toggle in the top right corner.
 
-    ![Activate Workflow](/images/letta-n8n/n8n-activate-workflow.png)
+    ![Activate workflow](/images/letta-n8n/n8n-activate-workflow.png)
   </Step>
 </Steps>
 
 Your n8n workflow is now live and will process new support tickets automatically.
 
-## Testing the Complete Flow
+## Step 3: Test the complete flow
 
 Add an example ticket to your Google Sheet:
 
@@ -861,28 +857,28 @@ Add an example ticket to your Google Sheet:
 |-----------|---------------|----------------|---------|-------------|----------|
 | 1 | James Doe | james@example.com | Cannot access account | Getting an error when logging in | High |
 
-Wait 1-2 minutes for n8n to detect the new row (polling interval varies). You should receive a Slack notification with:
+Wait one to two minutes for n8n to detect the new row (the polling interval varies). You should receive a Slack notification with the following information:
 
 - The ticket details from Google Sheets
 - Letta's intelligent routing recommendation with reasoning
 - A suggested response message
-- Estimated resolution time
+- An estimated resolution time
 
 Try adding another ticket from the same customer. The agent will remember the first interaction and provide context-aware routing based on the customer's history.
 
-![Complete Flow Example](/images/letta-n8n/n8n-complete-flow.png)
+![Complete flow example](/images/letta-n8n/n8n-complete-flow.png)
 
-## Next Steps
+## Next steps
 
-Now that you've integrated a Letta agent into your n8n workflow, you can apply this same pattern to other use cases like lead qualification, content moderation, or expense approval.
+Now that you've integrated a Letta agent into your n8n workflow, you can apply this same pattern to other use cases, such as lead qualification, content moderation, or expense approval.
 
 Both n8n and Letta support self-hosted deployment, giving you full ownership of your automation infrastructure. We'll cover how to self-host both platforms in a future guide.
 
-To extend what you've built, explore these guides:
+Explore these guides to see how you can extend what you've built:
 
 <CardGroup cols={2}>
   <Card
-    title="Custom Tools"
+    title="Custom tools"
     icon="fa-sharp fa-light fa-wrench"
     href="/guides/agents/custom-tools"
     iconPosition="left"
@@ -890,7 +886,7 @@ To extend what you've built, explore these guides:
     Learn how to create custom tools to extend your agent's capabilities beyond message handling.
   </Card>
   <Card
-    title="Memory Management"
+    title="Memory management"
     icon="fa-sharp fa-light fa-brain"
     href="/guides/agents/memory"
     iconPosition="left"
